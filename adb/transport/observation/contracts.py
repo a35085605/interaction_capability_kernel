@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from collections.abc import Iterator
+from dataclasses import dataclass
+from numbers import Integral
+from typing import Protocol
+
+from adb.configuration import AdbServerId
+from adb.errors import (
+    AdbError,
+    AdbProtocolError,
+    AdbServerConnectionError,
+    AdbServiceError,
+)
+from adb.transport.inventory.domain import AdbDevicesSnapshot
+
+
+@dataclass(frozen=True, slots=True, order=True)
+class AdbObservationSessionId:
+    """Caller-visible identity for one transport-inventory observation generation."""
+
+    server_id: AdbServerId
+    generation: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.server_id, AdbServerId):
+            raise TypeError("server_id must be AdbServerId")
+        if isinstance(self.generation, bool) or not isinstance(self.generation, Integral):
+            raise TypeError("generation must be an integer")
+        generation = int(self.generation)
+        if generation <= 0:
+            raise ValueError("generation must be greater than zero")
+        object.__setattr__(self, "generation", generation)
+
+
+class AdbObservationError(AdbError):
+    """Base error for failures while observing ADB state."""
+
+
+class AdbObservationServerConnectionError(
+    AdbObservationError,
+    AdbServerConnectionError,
+):
+    """Observation failed because its smart-socket session to the ADB server was lost."""
+
+
+class AdbObservationServiceError(AdbObservationError, AdbServiceError):
+    """ADB server rejected the requested observation service."""
+
+    def __init__(self, detail: str) -> None:
+        AdbServiceError.__init__(self, "host:track-devices-proto-binary", detail)
+
+
+class AdbObservationProtocolError(AdbObservationError, AdbProtocolError):
+    """ADB observation data violated the expected smart-socket protocol."""
+
+
+class AdbDevicesSnapshotSource(Protocol):
+    """Long-lived source of ADB transport-inventory snapshots."""
+
+    def snapshots(self) -> Iterator[AdbDevicesSnapshot]:
+        """Yield complete snapshots until the source is closed or exhausted."""
+        ...
+
+    def close(self) -> None:
+        """Permanently close the source and interrupt an active blocking session."""
+        ...
+
+
+__all__ = [
+    "AdbDevicesSnapshotSource",
+    "AdbObservationError",
+    "AdbObservationProtocolError",
+    "AdbObservationServerConnectionError",
+    "AdbObservationServiceError",
+    "AdbObservationSessionId",
+]

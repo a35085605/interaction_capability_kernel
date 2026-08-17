@@ -1,0 +1,5 @@
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+Display #0 (activities from top to bottom):
+  mResumedActivity: ActivityRecord{abc123 u0 com.example/.MainActivity t42}
+Display #7 (activities from top to bottom):
+  topResumedActivity=ActivityRecord{def456 u10 com.work/com.work.SecondaryActivity t99}

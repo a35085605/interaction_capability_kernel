@@ -1,0 +1,14 @@
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  mCurrentFocus=Window{a1b2c3 u0 com.example/.MainActivity}
+  Window #0 Window{a1b2c3 u0 com.example/.MainActivity}:
+    mDisplayId=0
+    mViewVisibility=0x0 mHaveFrame=true mObscured=false
+    mHasSurface=true isReadyForDisplay()=true
+    Frames: containing=[0,0][1080,2400] parent=[0,0][1080,2400] frame=[0,72][1080,2200]
+    mWindowingMode=fullscreen package=com.example
+  Window #1 Window{d4e5f6 u0 com.android.systemui/com.android.systemui.statusbar.StatusBar}:
+    mDisplayId=0
+    mViewVisibility=0x0
+    mHasSurface=true
+    Frames: frame=[0,0][1080,72]
+    mWindowingMode=fullscreen package=com.android.systemui

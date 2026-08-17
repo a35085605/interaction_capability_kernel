@@ -1,0 +1,3 @@
+WINDOW MANAGER POLICY STATE (dumpsys window policy)
+  mKeyguardShowing=true
+  mKeyguardOccluded=false

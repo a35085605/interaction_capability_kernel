@@ -1,0 +1,2 @@
+mBaseDisplayInfo=DisplayInfo{"Built-in Screen", displayId 0, displayGroupId 0, real 1080 x 2400, largest app 1080 x 2400, rotation 1, modeId 1, refreshRate 120.0, density 420 (420.0 x 420.0) dpi, type INTERNAL, uniqueId "local:4619827259835644672"}
+mBaseDisplayInfo=DisplayInfo{"Virtual", displayId 7, displayGroupId 0, real 800 x 600, largest app 800 x 600, rotation 0, modeId 2, refreshRate 60.0, density 240 (240.0 x 240.0) dpi, type VIRTUAL, uniqueId "virtual:example:7"}

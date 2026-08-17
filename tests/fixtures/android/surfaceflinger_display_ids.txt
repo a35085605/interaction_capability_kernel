@@ -1,0 +1,2 @@
+Display 21691504607621632 (HWC display 0): port=0 pnpId=SHP displayName="LQ123P1JX32"
+Display 9834494747159041 (HWC display 2): port=1 pnpId=HWP displayName="HP Z24i"

@@ -1,0 +1,5 @@
+Packages:
+  Package [com.example] (abc):
+    userId=10234
+    User 0: ceDataInode=1 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+    User 10: ceDataInode=2 installed=true hidden=false suspended=true distractionFlags=0 stopped=false notLaunched=false enabled=1 instant=false virtual=false

@@ -1,0 +1,4 @@
+Display 7:
+  mDisplayId=7
+  mBaseDisplayInfo=DisplayInfo{"Virtual", real 800 x 600, largest app 800 x 600, rotation 0, density 240 (240.0 x 240.0) dpi}
+  mOverrideDisplayInfo=DisplayInfo{"Virtual", real 1024 x 768, largest app 1024 x 768, rotation 2, density 320 (320.0 x 320.0) dpi}
