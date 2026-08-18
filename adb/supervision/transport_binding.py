@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from threading import Lock, Thread, current_thread
 from typing import Protocol, runtime_checkable
 
-from adb.configuration import AdbServerConfiguration
+from adb.server.endpoint import AdbServerEndpoint
 from adb.errors import AdbError
 from adb.supervision.model import AdbTransportBindingSupervisionPolicy
 from adb.supervision.signal import (
@@ -75,7 +75,7 @@ class AdbTransportBindingSupervisor:
 
     def __init__(
         self,
-        configuration: AdbServerConfiguration,
+        endpoint: AdbServerEndpoint,
         event_bus: EventBus,
         observation: AdbTransportInventoryObservationController,
         snapshot_reader: AdbDevicesSnapshotReader,
@@ -83,8 +83,8 @@ class AdbTransportBindingSupervisor:
         *,
         _thread_factory: _ThreadFactory = _default_thread_factory,
     ) -> None:
-        if not isinstance(configuration, AdbServerConfiguration):
-            raise TypeError("configuration must be AdbServerConfiguration")
+        if not isinstance(endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not callable(getattr(event_bus, "publish", None)) or not callable(
             getattr(event_bus, "subscribe", None)
         ) or not callable(getattr(event_bus, "unsubscribe", None)):
@@ -95,7 +95,7 @@ class AdbTransportBindingSupervisor:
             raise TypeError("snapshot_reader must provide read()")
         if not callable(preparation_factory):
             raise TypeError("preparation_factory must be callable")
-        self.configuration = configuration
+        self.endpoint = endpoint
         self._bus = event_bus
         self._observation = observation
         self._snapshot_reader = snapshot_reader
@@ -129,8 +129,8 @@ class AdbTransportBindingSupervisor:
     ) -> None:
         if not isinstance(configuration, AdbTransportBindingConfiguration):
             raise TypeError("configuration must be AdbTransportBindingConfiguration")
-        if configuration.server_id != self.configuration.server_id:
-            raise ValueError("binding configuration server_id does not match ADB server")
+        if configuration.endpoint != self.endpoint:
+            raise ValueError("binding configuration endpoint does not match ADB server endpoint")
         if policy is None:
             policy = AdbTransportBindingSupervisionPolicy()
         if not isinstance(policy, AdbTransportBindingSupervisionPolicy):
@@ -188,10 +188,10 @@ class AdbTransportBindingSupervisor:
 
     def _project_fresh_snapshot(self, serial: AdbDeviceSerial) -> None:
         session_id = self._observation.current_session_id
-        if session_id is None or session_id.server_id != self.configuration.server_id:
+        if session_id is None or session_id.endpoint != self.endpoint:
             return
         try:
-            snapshot = self._snapshot_reader.read(self.configuration.endpoint)
+            snapshot = self._snapshot_reader.read(self.endpoint)
         except AdbError:
             return
         if self._observation.current_session_id != session_id:
@@ -199,7 +199,7 @@ class AdbTransportBindingSupervisor:
         self._apply_snapshot(session_id, snapshot, serial=serial)
 
     def _on_observation_started(self, event: AdbTransportInventoryObservationStarted) -> None:
-        if event.session_id.server_id != self.configuration.server_id:
+        if event.session_id.endpoint != self.endpoint:
             return
         with self._lock:
             if self._closed:
@@ -210,7 +210,7 @@ class AdbTransportBindingSupervisor:
                 registration.recovery_attempted_for_absence = False
 
     def _on_snapshot_observed(self, event: AdbTransportInventorySnapshotObserved) -> None:
-        if event.session_id.server_id != self.configuration.server_id:
+        if event.session_id.endpoint != self.endpoint:
             return
         self._apply_snapshot(event.session_id, event.snapshot)
 
@@ -299,7 +299,7 @@ class AdbTransportBindingSupervisor:
                     "preparation_factory must return an ADB transport preparation executor"
                 )
             result = orchestrator.prepare(
-                AdbTransportPreparation(configuration.server_id, configuration.serial),
+                AdbTransportPreparation(configuration.endpoint, configuration.serial),
                 preparation_policy,
             )
             with self._lock:

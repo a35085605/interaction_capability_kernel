@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import TypeAlias
 
 from adb.server.lifecycle.command import AdbServerStart, AdbServerStop
-from adb.configuration import AdbServerId
 from adb.server.lifecycle.ensure import (
     AdbServerEnsureResult,
     AdbServerProbeResult,

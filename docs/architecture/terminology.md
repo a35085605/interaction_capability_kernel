@@ -43,16 +43,13 @@ platform-neutral input/touch interaction commands. They are peer capabilities.
 protocol vocabulary: `AdbServerStatus`, `AdbDevicesSnapshot`, `AdbTrackedDevice`,
 `AdbConnectionState`, and `AdbConnectionType`. The current native transport identity is
 `AdbTrackedDevice.transport_id`; `AdbTransportFeatures` is the open advertised feature set
-for one selected transport. `AdbServerId` is a caller-owned configuration identity and is
-intentionally separate from native ADB facts. `AdbDeviceSerial` is the persistent native key
-used to identify configured transports across inventory observations; `AdbTransportId` remains
-a server-local runtime identity derived from those observations. `AdbServerConfiguration` is
-an immutable binding from one `AdbServerId` to the smart-socket `AdbServerEndpoint` used for
-host queries, commands, and ADB-domain orchestration. `adb.server.provisioning` owns creation
-of those runtime bindings: callers may omit the endpoint for allocator-selected provisioning
-or request an explicit endpoint, but an existing server id cannot be rebound to another
-endpoint within the same provisioner. Exact endpoint values are exclusively owned by one
-server id within that provisioning scope. Android owns `AndroidUserId`, `AndroidPackageName`,
+for one selected transport. `AdbServerEndpoint` is the ADB-domain server identity used for host
+queries, commands, observation, and same-domain orchestration. Caller-owned logical server ids
+and their association with endpoints remain external composition. `AdbDeviceSerial` is the
+persistent native key used to identify configured transports across inventory observations;
+`AdbTransportId` remains a server-local runtime identity derived from those observations.
+`adb.server.provisioning` may reserve endpoint values, but it does not own caller ids or a
+logical-id binding registry. Android owns `AndroidUserId`, `AndroidPackageName`,
 `AndroidComponentName`, logical `AndroidDisplayId`, and physical capture
 `AndroidPhysicalDisplayId`. Logical and physical display IDs are never implicitly
 interchangeable.

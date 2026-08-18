@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from numbers import Integral
 from typing import Protocol
 
-from adb.configuration import AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from adb.errors import (
     AdbError,
     AdbProtocolError,
@@ -17,14 +17,14 @@ from adb.transport.inventory.domain import AdbDevicesSnapshot
 
 @dataclass(frozen=True, slots=True, order=True)
 class AdbObservationSessionId:
-    """Caller-visible identity for one transport-inventory observation generation."""
+    """ADB-native identity for one endpoint-scoped transport-inventory observation generation."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     generation: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if isinstance(self.generation, bool) or not isinstance(self.generation, Integral):
             raise TypeError("generation must be an integer")
         generation = int(self.generation)

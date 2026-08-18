@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import math
 import subprocess
 
-from adb.configuration import AdbServerConfiguration
+from adb.server.endpoint import AdbServerEndpoint
 from adb.transport.selection import AdbTransportById, AdbTransportBySerial, AdbTransportSelector
 from native_attempt import NativeAttemptResult, NativeAttemptStatus, NativeCompletionScope
 
@@ -35,17 +35,10 @@ def selector_args(selector: AdbTransportSelector) -> list[str]:
     raise TypeError("selector must be an ADB transport selector")
 
 
-def server_args(configuration: AdbServerConfiguration) -> list[str]:
-    endpoint = configuration.endpoint
+def server_args(endpoint: AdbServerEndpoint) -> list[str]:
+    if not isinstance(endpoint, AdbServerEndpoint):
+        raise TypeError("endpoint must be AdbServerEndpoint")
     return ["-H", endpoint.host, "-P", str(endpoint.port)]
-
-
-def require_operation_server(
-    configuration: AdbServerConfiguration,
-    operation_server_id: object,
-) -> None:
-    if operation_server_id != configuration.server_id:
-        raise ValueError("operation server_id does not match configured ADB server")
 
 
 def run_adb(
@@ -110,7 +103,6 @@ def run_adb(
 __all__ = [
     "normalize_executable",
     "normalize_timeout",
-    "require_operation_server",
     "run_adb",
     "selector_args",
     "server_args",

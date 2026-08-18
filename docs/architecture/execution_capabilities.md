@@ -17,7 +17,7 @@ capture                         execution
 Platform domains may implement these contracts through native adapters, but a platform-native
 operation does not belong in `execution` merely because it causes an external effect. If the
 operation requires native nouns such as `AndroidPackageName`, `AndroidUserId`, `WindowId`, or
-`AdbServerId` for its semantics, the owning platform domain should normally own that command.
+`AdbServerEndpoint` for its semantics, the owning platform domain should normally own that command.
 
 Before an execution command is selected, external composition may use independently acquired
 native facts and `ApplicationPresentationMapping`. Platform-domain preparation or recovery

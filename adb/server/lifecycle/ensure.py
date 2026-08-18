@@ -8,7 +8,7 @@ from numbers import Real
 from time import monotonic, sleep
 from typing import TypeAlias
 
-from adb.configuration import AdbServerConfiguration, AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from adb.errors import AdbError, AdbServerConnectionError
 from adb.server.lifecycle.command import (
     AdbServerStart,
@@ -99,12 +99,12 @@ class AdbServerEnsurePolicy:
 class AdbServerEnsureAvailable:
     """Request domain orchestration to establish and verify server availability."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     policy: AdbServerEnsurePolicy
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(self.policy, AdbServerEnsurePolicy):
             raise TypeError("policy must be AdbServerEnsurePolicy")
 
@@ -113,12 +113,12 @@ class AdbServerEnsureAvailable:
 class AdbServerEnsureUnavailable:
     """Request domain orchestration to establish and verify server unavailability."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     policy: AdbServerEnsurePolicy
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(self.policy, AdbServerEnsurePolicy):
             raise TypeError("policy must be AdbServerEnsurePolicy")
 
@@ -130,14 +130,14 @@ AdbServerEnsureOperation: TypeAlias = AdbServerEnsureAvailable | AdbServerEnsure
 class AdbServerProbeResult:
     """Evidence from one fresh probe performed by ADB server orchestration."""
 
-    configuration: AdbServerConfiguration
+    endpoint: AdbServerEndpoint
     availability: AdbServerAvailability
     server_status: AdbServerStatus | None = None
     diagnostic: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.configuration, AdbServerConfiguration):
-            raise TypeError("configuration must be AdbServerConfiguration")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(self.availability, AdbServerAvailability):
             raise TypeError("availability must be AdbServerAvailability")
         if self.availability is AdbServerAvailability.AVAILABLE:
@@ -184,8 +184,8 @@ class AdbServerEnsureResult:
             raise TypeError("attempts must be a tuple of NativeAttemptResult")
         if not isinstance(self.final_probe, AdbServerProbeResult):
             raise TypeError("final_probe must be AdbServerProbeResult")
-        if self.final_probe.configuration.server_id != self.operation.server_id:
-            raise ValueError("final probe server_id must match ensure operation")
+        if self.final_probe.endpoint != self.operation.endpoint:
+            raise ValueError("final probe endpoint must match ensure operation")
         desired = (
             AdbServerAvailability.AVAILABLE
             if isinstance(self.operation, AdbServerEnsureAvailable)
@@ -214,7 +214,7 @@ class AdbServerEnsureOrchestrator:
 
     def __init__(
         self,
-        configuration: AdbServerConfiguration,
+        endpoint: AdbServerEndpoint,
         status_reader: AdbServerStatusReader,
         starter: AdbServerStarter,
         stopper: AdbServerStopper,
@@ -223,8 +223,8 @@ class AdbServerEnsureOrchestrator:
         _monotonic: _MonotonicClock = monotonic,
         _sleep: _Sleeper = sleep,
     ) -> None:
-        if not isinstance(configuration, AdbServerConfiguration):
-            raise TypeError("configuration must be AdbServerConfiguration")
+        if not isinstance(endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not callable(getattr(status_reader, "read", None)):
             raise TypeError("status_reader must provide read()")
         if not callable(getattr(starter, "start", None)):
@@ -233,7 +233,7 @@ class AdbServerEnsureOrchestrator:
             raise TypeError("stopper must provide stop()")
         if not isinstance(publisher, EventPublisher):
             raise TypeError("publisher must satisfy EventPublisher")
-        self.configuration = configuration
+        self.endpoint = endpoint
         self._status_reader = status_reader
         self._starter = starter
         self._stopper = stopper
@@ -245,22 +245,22 @@ class AdbServerEnsureOrchestrator:
         from adb.server.signal import AdbServerProbeCompleted
 
         try:
-            status = self._status_reader.read(self.configuration.endpoint)
+            status = self._status_reader.read(self.endpoint)
         except AdbServerConnectionError as exc:
             result = AdbServerProbeResult(
-                configuration=self.configuration,
+                endpoint=self.endpoint,
                 availability=AdbServerAvailability.UNAVAILABLE,
                 diagnostic=str(exc),
             )
         except AdbError as exc:
             result = AdbServerProbeResult(
-                configuration=self.configuration,
+                endpoint=self.endpoint,
                 availability=AdbServerAvailability.INDETERMINATE,
                 diagnostic=str(exc),
             )
         else:
             result = AdbServerProbeResult(
-                configuration=self.configuration,
+                endpoint=self.endpoint,
                 availability=AdbServerAvailability.AVAILABLE,
                 server_status=status,
             )
@@ -272,8 +272,8 @@ class AdbServerEnsureOrchestrator:
 
         if not isinstance(operation, (AdbServerEnsureAvailable, AdbServerEnsureUnavailable)):
             raise TypeError("operation must be an ADB server ensure operation")
-        if operation.server_id != self.configuration.server_id:
-            raise ValueError("operation server_id does not match configured ADB server")
+        if operation.endpoint != self.endpoint:
+            raise ValueError("operation endpoint does not match configured ADB server endpoint")
         desired = (
             AdbServerAvailability.AVAILABLE
             if isinstance(operation, AdbServerEnsureAvailable)
@@ -292,9 +292,9 @@ class AdbServerEnsureOrchestrator:
             return result
         deadline = self._monotonic() + operation.policy.timeout_seconds
         command = (
-            AdbServerStart(operation.server_id)
+            AdbServerStart(operation.endpoint)
             if isinstance(operation, AdbServerEnsureAvailable)
-            else AdbServerStop(operation.server_id)
+            else AdbServerStop(operation.endpoint)
         )
         attempt = (
             self._starter.start(command)

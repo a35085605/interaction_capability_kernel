@@ -49,6 +49,8 @@ class AdbTransportInventoryObservationStarted:
     def __post_init__(self) -> None:
         _require_endpoint(self.endpoint)
         _require_session_id(self.session_id)
+        if self.session_id.endpoint != self.endpoint:
+            raise ValueError("session_id endpoint must match signal endpoint")
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +63,8 @@ class AdbTransportInventoryObservationStopped:
     def __post_init__(self) -> None:
         _require_endpoint(self.endpoint)
         _require_session_id(self.session_id)
+        if self.session_id.endpoint != self.endpoint:
+            raise ValueError("session_id endpoint must match signal endpoint")
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +79,8 @@ class AdbTransportInventoryObservationFailed:
     def __post_init__(self) -> None:
         _require_endpoint(self.endpoint)
         _require_session_id(self.session_id)
+        if self.session_id.endpoint != self.endpoint:
+            raise ValueError("session_id endpoint must match signal endpoint")
         if not isinstance(self.failure, AdbTransportInventoryObservationFailure):
             raise TypeError("failure must be AdbTransportInventoryObservationFailure")
         object.__setattr__(
@@ -98,6 +104,8 @@ class AdbTransportInventorySnapshotObserved:
     def __post_init__(self) -> None:
         _require_endpoint(self.endpoint)
         _require_session_id(self.session_id)
+        if self.session_id.endpoint != self.endpoint:
+            raise ValueError("session_id endpoint must match signal endpoint")
         if not isinstance(self.snapshot, AdbDevicesSnapshot):
             raise TypeError("snapshot must be AdbDevicesSnapshot")
 

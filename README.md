@@ -170,16 +170,17 @@ runtime transport instances; a serial-selected binding may nevertheless re-resol
 serial to a different current transport from fresh inventory. Rows with transport ID zero do
 not establish stable native runtime identity.
 
-`AdbServerEndpoint` identifies the smart-socket endpoint queried by host-side ADB clients.
-`AdbServerConfiguration` binds that endpoint to a caller-owned `AdbServerId` for ADB-domain
-composition. `AdbDeviceSerial` is the persistent native selection key for configured ADB
-transports. `AdbTransportId` is a server-local runtime identity derived from fresh inventory
-evidence; it is not a durable configuration key. Caller-owned `AdbServerId` lives under
-`adb.configuration`; serials and runtime transport IDs remain native ADB vocabulary.
+`AdbServerEndpoint` is the ADB-domain identity of one smart-socket server endpoint and is the
+server value consumed by host-side ADB queries, commands, observation, and same-domain
+orchestration. Caller-owned logical server ids and their `server_id -> AdbServerEndpoint`
+association stay in external composition rather than in the ADB domain. `AdbDeviceSerial` is
+the persistent native selection key for configured ADB transports. `AdbTransportId` is a
+server-local runtime identity derived from fresh inventory evidence; it is not a durable
+configuration key.
 `AdbTransportFeatures` is a selected-transport fact with an open native feature vocabulary.
 Android runtime facts are not folded into `AdbTrackedDevice`.
 
-`AdbTransportBindingConfiguration` associates one configured server with an `AdbDeviceSerial`
+`AdbTransportBindingConfiguration` associates one ADB server endpoint with an `AdbDeviceSerial`
 and an optional TCP connect address. The serial is deliberately independent from the connect
 address; preparation does not assume that the string passed to `adb connect` must later be the
 tracker serial. Runtime `transport_id` values remain fresh inventory facts rather than binding
@@ -208,8 +209,8 @@ continuity remains available only when a caller explicitly selects with `AdbTran
 Atomic `adb connect` attempt evidence is preserved, but fresh inventory evidence determines
 whether preparation is satisfied.
 
-`SubprocessAdbPairing` and `SubprocessAdbTransport` are each bound to an
-`AdbServerConfiguration` and pass that configured `-H` / `-P` endpoint to their CLI commands.
+`SubprocessAdbPairing` and `SubprocessAdbTransport` are each bound directly to an
+`AdbServerEndpoint` and pass that endpoint through `-H` / `-P` to their CLI commands.
 Pairing establishes the host-device wireless-debugging trust relationship; transport commands
 manage transport connection state separately.
 
@@ -222,8 +223,8 @@ payloads owned by their domain; supervisors decide what those signals mean.
 `AdbTransportInventoryObservationRunner` establishes `track-devices` stream mode before emitting
 `AdbTransportInventoryObservationStarted`, emits complete snapshots through
 `AdbTransportInventorySnapshotObserved`, and attaches an
-`AdbObservationSessionId` containing the configured server identity plus a monotonically
-increasing generation. A new generation establishes a new observation baseline; observation
+`AdbObservationSessionId` containing the ADB server endpoint plus a monotonically increasing
+generation. A new generation establishes a new observation baseline; observation
 termination does not imply that transports disappeared.
 
 `AdbServerEnsureOrchestrator` lives under `adb.server.lifecycle` and provides the concrete

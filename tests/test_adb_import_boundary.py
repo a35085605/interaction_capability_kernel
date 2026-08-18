@@ -41,6 +41,7 @@ assert 'geometry' not in sys.modules
 
     def test_legacy_adb_compatibility_modules_are_absent(self) -> None:
         for namespace in (
+            "adb.configuration",
             "adb.server.adapters",
             "adb.server.command",
             "adb.server.domain",

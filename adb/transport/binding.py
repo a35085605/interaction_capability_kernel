@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from adb.configuration import AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from adb.transport.inventory.domain import AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.selection import AdbDeviceSerial
 
@@ -21,7 +21,7 @@ def _normalize_optional_text(value: object, *, field_name: str) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportBindingConfiguration:
-    """Caller-owned configuration for one serial-selected ADB transport.
+    """ADB-domain binding for one endpoint and serial-selected transport.
 
     ``serial`` is the persistent native selection key for inventory resolution and is
     deliberately independent from ``connect_address``. The address passed to ``adb connect``
@@ -30,13 +30,13 @@ class AdbTransportBindingConfiguration:
     as binding configuration.
     """
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     serial: AdbDeviceSerial
     connect_address: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(self.serial, AdbDeviceSerial):
             raise TypeError("serial must be AdbDeviceSerial")
         object.__setattr__(

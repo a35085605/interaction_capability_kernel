@@ -111,7 +111,7 @@ same rule. `SERVICE` and `PROTOCOL` failures do not start the runtime re-establi
 Server ensure remains a sub-step of an establishment episode rather than the identity of the
 long-lived supervision cycle.
 
-`AdbObservationSessionId` combines the configured `AdbServerId` with a monotonically increasing
+`AdbObservationSessionId` combines the `AdbServerEndpoint` with a monotonically increasing
 generation. `AdbTransportInventoryObservation*` lifecycle signals and
 `AdbTransportInventorySnapshotObserved` carry this identity, allowing the supervisor and bounded
 episodes to ignore evidence for another generation. A newly established session is also a new

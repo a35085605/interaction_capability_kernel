@@ -5,7 +5,7 @@ from enum import Enum
 import math
 from numbers import Integral, Real
 
-from adb.configuration import AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from adb.transport.inventory.domain import (
     AdbConnectionState,
     AdbDevicesSnapshot,
@@ -67,12 +67,12 @@ def _normalize_optional_text(value: object, *, field_name: str) -> str | None:
 class AdbTransportPreparation:
     """Request one bounded preparation episode for a configured serial-selected transport."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     serial: AdbDeviceSerial
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(self.serial, AdbDeviceSerial):
             raise TypeError("serial must be AdbDeviceSerial")
 
@@ -81,12 +81,12 @@ class AdbTransportPreparation:
 class AdbTransportRecovery:
     """Request domain-local orchestration to recover one configured serial-selected transport."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     serial: AdbDeviceSerial
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(self.serial, AdbDeviceSerial):
             raise TypeError("serial must be AdbDeviceSerial")
 

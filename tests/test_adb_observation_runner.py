@@ -3,7 +3,6 @@ from __future__ import annotations
 from threading import Event
 import unittest
 
-from adb.configuration import AdbServerConfiguration, AdbServerId
 from adb.server import AdbServerEndpoint
 from adb.transport.inventory.domain import AdbDevicesSnapshot
 from adb.transport.observation.contracts import AdbObservationServerConnectionError
@@ -47,11 +46,8 @@ class _Source(AdbTrackDevicesSource):
 
 
 class AdbObservationRunnerTests(unittest.TestCase):
-    def _configuration(self) -> AdbServerConfiguration:
-        return AdbServerConfiguration(
-            AdbServerId("local-main"),
-            AdbServerEndpoint("127.0.0.1", 5037),
-        )
+    def _endpoint(self) -> AdbServerEndpoint:
+        return AdbServerEndpoint("127.0.0.1", 5037)
 
     def test_started_is_emitted_after_open_before_first_snapshot(self) -> None:
         bus = InMemoryEventBus()
@@ -65,20 +61,15 @@ class AdbObservationRunnerTests(unittest.TestCase):
 
         bus.subscribe(object, collect)
         runner = AdbTransportInventoryObservationRunner(
-            self._configuration(),
-            bus,
-            _source_factory=lambda endpoint: _Source(endpoint),
+            self._endpoint(), bus, _source_factory=lambda endpoint: _Source(endpoint)
         )
-
         session_id = runner.start()
         self.assertTrue(terminal.wait(2))
-
         self.assertIsInstance(observed[0], AdbTransportInventoryObservationStarted)
         self.assertIsInstance(observed[1], AdbTransportInventorySnapshotObserved)
         self.assertIsInstance(observed[2], AdbTransportInventoryObservationStopped)
         self.assertEqual(observed[0].session_id, session_id)
-        self.assertEqual(observed[1].session_id, session_id)
-        self.assertEqual(observed[2].session_id, session_id)
+        self.assertEqual(session_id.endpoint, self._endpoint())
 
     def test_server_connection_failure_is_generation_fenced_and_next_start_increments(self) -> None:
         bus = InMemoryEventBus()
@@ -96,18 +87,14 @@ class AdbObservationRunnerTests(unittest.TestCase):
             return _Source(endpoint, fail=fail_next.pop(0))
 
         runner = AdbTransportInventoryObservationRunner(
-            self._configuration(),
-            bus,
-            _source_factory=source_factory,
+            self._endpoint(), bus, _source_factory=source_factory
         )
-
         first = runner.start()
         self.assertTrue(terminal.wait(2))
         second_terminal = Event()
         bus.subscribe(AdbTransportInventoryObservationStopped, lambda event: second_terminal.set())
         second = runner.start()
         self.assertTrue(second_terminal.wait(2))
-
         self.assertEqual(first.generation, 1)
         self.assertEqual(second.generation, 2)
         self.assertEqual(failures[0].session_id, first)

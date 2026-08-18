@@ -48,10 +48,9 @@ re-resolved from fresh inventory as current facts change. `AdbTransportId` is th
 server-local runtime identity: it may be derived from fresh inventory and used when a caller
 explicitly wants exact runtime-transport selection, but it is not a durable configuration key.
 `AdbTransportFeatures` preserves the transport's advertised feature names as an open set; it is
-not a kernel-defined closed capability enum. `AdbServerId` is a caller-owned configuration
-identity under `adb.configuration`, not a field of native ADB state. `AdbServerConfiguration`
-binds one server identity to the smart-socket endpoint used by ADB queries, commands, and
-orchestration.
+not a kernel-defined closed capability enum. `AdbServerEndpoint` is the native ADB server
+identity used by ADB queries, commands, observation, and orchestration. Caller-owned logical
+server ids and the mapping from those ids to endpoints remain outside the ADB domain.
 
 Android framework/runtime facts are owned by the `android` domain. `AndroidDisplayId` is a
 logical framework display identity. `AndroidPhysicalDisplayId` is the SurfaceFlinger physical

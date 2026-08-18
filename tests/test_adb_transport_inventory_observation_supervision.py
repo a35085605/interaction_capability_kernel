@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import time
 import unittest
 
-from adb.configuration import AdbServerConfiguration, AdbServerId
 from adb.errors import AdbServerConnectionError
 from adb.server import AdbServerEndpoint, AdbServerStatus
 from adb.server.lifecycle import (
@@ -13,11 +12,7 @@ from adb.server.lifecycle import (
     AdbServerEnsurePolicy,
     AdbServerEnsureStatus,
 )
-from adb.server.signal import (
-    AdbServerCommandCompleted,
-    AdbServerEnsureCompleted,
-    AdbServerProbeCompleted,
-)
+from adb.server.signal import AdbServerCommandCompleted, AdbServerEnsureCompleted, AdbServerProbeCompleted
 from adb.supervision import (
     AdbTransportInventoryObservationEstablishmentExhausted,
     AdbTransportInventoryObservationEstablishmentRetryDue,
@@ -37,11 +32,7 @@ from adb.transport.observation.signal import (
     AdbTransportInventoryObservationStarted,
 )
 from eventing.adapters import InMemoryEventBus
-from native_attempt import (
-    NativeAttemptResult,
-    NativeAttemptStatus,
-    NativeCompletionScope,
-)
+from native_attempt import NativeAttemptResult, NativeAttemptStatus, NativeCompletionScope
 from scheduling import MisfirePolicy, ScheduleToken
 
 
@@ -90,13 +81,8 @@ class _Clock:
 
 
 class _Observation:
-    def __init__(
-        self,
-        configuration: AdbServerConfiguration,
-        bus: InMemoryEventBus,
-        outcomes: list[str],
-    ) -> None:
-        self.configuration = configuration
+    def __init__(self, endpoint: AdbServerEndpoint, bus: InMemoryEventBus, outcomes: list[str]) -> None:
+        self.endpoint = endpoint
         self.bus = bus
         self.outcomes = outcomes
         self.generation = 0
@@ -106,22 +92,14 @@ class _Observation:
 
     def start(self) -> AdbObservationSessionId:
         self.generation += 1
-        self.current_session_id = AdbObservationSessionId(
-            self.configuration.server_id,
-            self.generation,
-        )
+        self.current_session_id = AdbObservationSessionId(self.endpoint, self.generation)
         outcome = self.outcomes.pop(0)
         if outcome == "started":
-            self.bus.publish(
-                AdbTransportInventoryObservationStarted(
-                    self.configuration.endpoint,
-                    self.current_session_id,
-                )
-            )
+            self.bus.publish(AdbTransportInventoryObservationStarted(self.endpoint, self.current_session_id))
         elif outcome == "connection_failed":
             self.bus.publish(
                 AdbTransportInventoryObservationFailed(
-                    self.configuration.endpoint,
+                    self.endpoint,
                     self.current_session_id,
                     AdbTransportInventoryObservationFailure.SERVER_CONNECTION,
                     "connection failed",
@@ -130,7 +108,7 @@ class _Observation:
         elif outcome == "protocol_failed":
             self.bus.publish(
                 AdbTransportInventoryObservationFailed(
-                    self.configuration.endpoint,
+                    self.endpoint,
                     self.current_session_id,
                     AdbTransportInventoryObservationFailure.PROTOCOL,
                     "protocol failed",
@@ -173,22 +151,15 @@ class _Scheduler:
         return token
 
 
-def _configuration() -> AdbServerConfiguration:
-    return AdbServerConfiguration(
-        AdbServerId("local-main"),
-        AdbServerEndpoint("127.0.0.1", 5037),
-    )
+def _endpoint() -> AdbServerEndpoint:
+    return AdbServerEndpoint("127.0.0.1", 5037)
 
 
 def _attempt(status: NativeAttemptStatus = NativeAttemptStatus.SUCCEEDED) -> NativeAttemptResult:
     now = datetime(2026, 8, 17, tzinfo=timezone.utc)
     return NativeAttemptResult(
         status=status,
-        completion_scope=(
-            NativeCompletionScope.PROCESS_EXIT
-            if status is NativeAttemptStatus.SUCCEEDED
-            else None
-        ),
+        completion_scope=(NativeCompletionScope.PROCESS_EXIT if status is NativeAttemptStatus.SUCCEEDED else None),
         backend_id="test-adb",
         started_at=now,
         finished_at=now,
@@ -209,55 +180,26 @@ class AdbServerEnsureOrchestratorTests(unittest.TestCase):
         bus = InMemoryEventBus()
         signals: list[object] = []
         bus.subscribe(object, signals.append)
-        reader = _StatusReader(
-            [AdbServerConnectionError("refused"), AdbServerStatus(version="0010")]
-        )
+        reader = _StatusReader([AdbServerConnectionError("refused"), AdbServerStatus(version="0010")])
         commands = _ServerCommands(_attempt())
         clock = _Clock()
         orchestrator = AdbServerEnsureOrchestrator(
-            _configuration(),
-            reader,
-            commands,
-            commands,
-            bus,
-            _monotonic=clock.monotonic,
-            _sleep=clock.sleep,
+            _endpoint(), reader, commands, commands, bus, _monotonic=clock.monotonic, _sleep=clock.sleep
         )
-
-        result = orchestrator.ensure(
-            AdbServerEnsureAvailable(
-                _configuration().server_id,
-                AdbServerEnsurePolicy(1, 0.1),
-            )
-        )
-
+        result = orchestrator.ensure(AdbServerEnsureAvailable(_endpoint(), AdbServerEnsurePolicy(1, 0.1)))
         self.assertIs(result.status, AdbServerEnsureStatus.SATISFIED)
         self.assertEqual(len(commands.started), 1)
         self.assertEqual(
             [type(signal) for signal in signals],
-            [
-                AdbServerProbeCompleted,
-                AdbServerCommandCompleted,
-                AdbServerProbeCompleted,
-                AdbServerEnsureCompleted,
-            ],
+            [AdbServerProbeCompleted, AdbServerCommandCompleted, AdbServerProbeCompleted, AdbServerEnsureCompleted],
         )
 
     def test_already_available_does_not_issue_native_command(self) -> None:
         bus = InMemoryEventBus()
         reader = _StatusReader([AdbServerStatus()])
         commands = _ServerCommands(_attempt())
-        orchestrator = AdbServerEnsureOrchestrator(
-            _configuration(), reader, commands, commands, bus
-        )
-
-        result = orchestrator.ensure(
-            AdbServerEnsureAvailable(
-                _configuration().server_id,
-                AdbServerEnsurePolicy(1, 0.1),
-            )
-        )
-
+        orchestrator = AdbServerEnsureOrchestrator(_endpoint(), reader, commands, commands, bus)
+        result = orchestrator.ensure(AdbServerEnsureAvailable(_endpoint(), AdbServerEnsurePolicy(1, 0.1)))
         self.assertIs(result.status, AdbServerEnsureStatus.SATISFIED)
         self.assertEqual(result.attempts, ())
         self.assertEqual(commands.started, [])
@@ -268,22 +210,9 @@ class AdbServerEnsureOrchestratorTests(unittest.TestCase):
         commands = _ServerCommands(_attempt())
         clock = _Clock()
         orchestrator = AdbServerEnsureOrchestrator(
-            _configuration(),
-            reader,
-            commands,
-            commands,
-            bus,
-            _monotonic=clock.monotonic,
-            _sleep=clock.sleep,
+            _endpoint(), reader, commands, commands, bus, _monotonic=clock.monotonic, _sleep=clock.sleep
         )
-
-        result = orchestrator.ensure(
-            AdbServerEnsureAvailable(
-                _configuration().server_id,
-                AdbServerEnsurePolicy(0.2, 0.1),
-            )
-        )
-
+        result = orchestrator.ensure(AdbServerEnsureAvailable(_endpoint(), AdbServerEnsurePolicy(0.2, 0.1)))
         self.assertIs(result.status, AdbServerEnsureStatus.TIMED_OUT)
         self.assertGreaterEqual(reader.calls, 3)
         self.assertEqual(len(result.attempts), 1)
@@ -292,37 +221,24 @@ class AdbServerEnsureOrchestratorTests(unittest.TestCase):
 class AdbTransportInventoryObservationEstablishmentTests(unittest.TestCase):
     def test_establishment_requires_started_evidence_after_server_ensure(self) -> None:
         bus = InMemoryEventBus()
-        reader = _StatusReader(
-            [
-                AdbServerConnectionError("down"),
-                AdbServerConnectionError("down"),
-                AdbServerStatus(),
-            ]
-        )
+        reader = _StatusReader([
+            AdbServerConnectionError("down"),
+            AdbServerConnectionError("down"),
+            AdbServerStatus(),
+        ])
         commands = _ServerCommands(_attempt())
-        observation = _Observation(_configuration(), bus, ["started"])
-        ensure = AdbServerEnsureOrchestrator(
-            _configuration(), reader, commands, commands, bus
-        )
-        establishment = AdbTransportInventoryObservationEstablishmentOrchestrator(
-            _configuration(), bus, observation, ensure
-        )
-
+        observation = _Observation(_endpoint(), bus, ["started"])
+        ensure = AdbServerEnsureOrchestrator(_endpoint(), reader, commands, commands, bus)
+        establishment = AdbTransportInventoryObservationEstablishmentOrchestrator(_endpoint(), bus, observation, ensure)
         result = establishment.establish(
             AdbTransportInventoryObservationEstablishment(
-                _configuration().server_id,
-                AdbTransportInventoryObservationEstablishmentPolicy(
-                    2.0,
-                    AdbServerEnsurePolicy(1.0, 0.1),
-                ),
+                _endpoint(),
+                AdbTransportInventoryObservationEstablishmentPolicy(2.0, AdbServerEnsurePolicy(1.0, 0.1)),
             )
         )
-
-        self.assertIs(
-            result.status,
-            AdbTransportInventoryObservationEstablishmentStatus.SATISFIED,
-        )
+        self.assertIs(result.status, AdbTransportInventoryObservationEstablishmentStatus.SATISFIED)
         self.assertEqual(result.observation_session_id.generation, 1)
+        self.assertEqual(result.observation_session_id.endpoint, _endpoint())
         self.assertEqual(len(result.attempts), 1)
         self.assertEqual(len(commands.started), 1)
 
@@ -330,55 +246,27 @@ class AdbTransportInventoryObservationEstablishmentTests(unittest.TestCase):
         bus = InMemoryEventBus()
         reader = _StatusReader([AdbServerStatus()])
         commands = _ServerCommands(_attempt())
-        observation = _Observation(_configuration(), bus, ["connection_failed"])
-        ensure = AdbServerEnsureOrchestrator(
-            _configuration(), reader, commands, commands, bus
-        )
-        establishment = AdbTransportInventoryObservationEstablishmentOrchestrator(
-            _configuration(), bus, observation, ensure
-        )
-
+        observation = _Observation(_endpoint(), bus, ["connection_failed"])
+        ensure = AdbServerEnsureOrchestrator(_endpoint(), reader, commands, commands, bus)
+        establishment = AdbTransportInventoryObservationEstablishmentOrchestrator(_endpoint(), bus, observation, ensure)
         result = establishment.establish(
             AdbTransportInventoryObservationEstablishment(
-                _configuration().server_id,
-                AdbTransportInventoryObservationEstablishmentPolicy(
-                    2.0,
-                    AdbServerEnsurePolicy(1.0, 0.1),
-                ),
+                _endpoint(),
+                AdbTransportInventoryObservationEstablishmentPolicy(2.0, AdbServerEnsurePolicy(1.0, 0.1)),
             )
         )
-
-        self.assertIs(
-            result.status,
-            AdbTransportInventoryObservationEstablishmentStatus.FAILED,
-        )
-        self.assertIs(
-            result.observation_failure,
-            AdbTransportInventoryObservationFailure.SERVER_CONNECTION,
-        )
+        self.assertIs(result.status, AdbTransportInventoryObservationEstablishmentStatus.FAILED)
+        self.assertIs(result.observation_failure, AdbTransportInventoryObservationFailure.SERVER_CONNECTION)
 
 
 class AdbTransportInventoryObservationSupervisorTests(unittest.TestCase):
-    def _supervisor(
-        self,
-        reader: _StatusReader,
-        commands: _ServerCommands,
-        outcomes: list[str],
-        *,
-        max_attempts: int | None = None,
-    ):
+    def _supervisor(self, reader: _StatusReader, commands: _ServerCommands, outcomes: list[str], *, max_attempts: int | None = None):
         bus = InMemoryEventBus()
-        observation = _Observation(_configuration(), bus, outcomes)
+        observation = _Observation(_endpoint(), bus, outcomes)
         scheduler = _Scheduler()
         clock = _Clock()
         ensure = AdbServerEnsureOrchestrator(
-            _configuration(),
-            reader,
-            commands,
-            commands,
-            bus,
-            _monotonic=clock.monotonic,
-            _sleep=clock.sleep,
+            _endpoint(), reader, commands, commands, bus, _monotonic=clock.monotonic, _sleep=clock.sleep
         )
         policy = AdbTransportInventoryObservationSupervisionPolicy(
             ensure_policy=AdbServerEnsurePolicy(0.2, 0.1),
@@ -390,26 +278,17 @@ class AdbTransportInventoryObservationSupervisorTests(unittest.TestCase):
             max_attempts=max_attempts,
         )
         supervisor = AdbTransportInventoryObservationSupervisor(
-            _configuration(),
-            bus,
-            observation,
-            ensure,
-            scheduler,
-            policy,
-            _random=lambda: 0.5,
+            _endpoint(), bus, observation, ensure, scheduler, policy, _random=lambda: 0.5
         )
         return bus, observation, scheduler, supervisor
 
     def test_start_initializes_observation_through_establishment_episode(self) -> None:
         reader = _StatusReader([AdbServerStatus()])
         commands = _ServerCommands(_attempt())
-        bus, observation, scheduler, supervisor = self._supervisor(
-            reader, commands, ["started"]
-        )
-
+        bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started"])
         first = supervisor.start()
-
         self.assertEqual(first.generation, 1)
+        self.assertEqual(first.endpoint, _endpoint())
         self.assertEqual(observation.generation, 1)
         self.assertEqual(commands.started, [])
         self.assertEqual(scheduler.scheduled, [])
@@ -417,21 +296,14 @@ class AdbTransportInventoryObservationSupervisorTests(unittest.TestCase):
     def test_runtime_server_connection_failure_establishes_new_generation(self) -> None:
         reader = _StatusReader([AdbServerStatus()], repeat_last=True)
         commands = _ServerCommands(_attempt())
-        bus, observation, scheduler, supervisor = self._supervisor(
-            reader, commands, ["started", "started"]
-        )
+        bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started", "started"])
         first = supervisor.start()
-
         bus.publish(
             AdbTransportInventoryObservationFailed(
-                _configuration().endpoint,
-                first,
-                AdbTransportInventoryObservationFailure.SERVER_CONNECTION,
-                "socket lost",
+                _endpoint(), first, AdbTransportInventoryObservationFailure.SERVER_CONNECTION, "socket lost"
             )
         )
         _wait_until(lambda: observation.generation == 2)
-
         self.assertEqual(commands.started, [])
         self.assertEqual(scheduler.scheduled, [])
 
@@ -439,55 +311,38 @@ class AdbTransportInventoryObservationSupervisorTests(unittest.TestCase):
         reader = _StatusReader([AdbServerStatus()], repeat_last=True)
         commands = _ServerCommands(_attempt())
         bus, observation, scheduler, supervisor = self._supervisor(
-            reader,
-            commands,
-            ["connection_failed", "connection_failed"],
-            max_attempts=2,
+            reader, commands, ["connection_failed", "connection_failed"], max_attempts=2
         )
         exhausted: list[AdbTransportInventoryObservationEstablishmentExhausted] = []
-        bus.subscribe(
-            AdbTransportInventoryObservationEstablishmentExhausted,
-            exhausted.append,
-        )
-
+        bus.subscribe(AdbTransportInventoryObservationEstablishmentExhausted, exhausted.append)
         first = supervisor.start()
-
         self.assertIsNone(first)
         self.assertEqual(observation.generation, 1)
         self.assertEqual(len(scheduler.scheduled), 1)
         delay, retry_event, _ = scheduler.scheduled[0]
         self.assertEqual(delay.total_seconds(), 1.0)
-        self.assertIsInstance(
-            retry_event,
-            AdbTransportInventoryObservationEstablishmentRetryDue,
-        )
+        self.assertIsInstance(retry_event, AdbTransportInventoryObservationEstablishmentRetryDue)
+        self.assertEqual(retry_event.endpoint, _endpoint())
         self.assertEqual(retry_event.attempt_number, 2)
-
         bus.publish(retry_event)
         _wait_until(lambda: len(exhausted) == 1)
-
         self.assertEqual(observation.generation, 2)
         self.assertEqual(exhausted[0].attempts, 2)
         self.assertEqual(exhausted[0].cycle_id, retry_event.cycle_id)
+        self.assertEqual(exhausted[0].endpoint, _endpoint())
         self.assertEqual(len(scheduler.scheduled), 1)
 
     def test_non_server_connection_failure_does_not_trigger_reestablishment(self) -> None:
         reader = _StatusReader([AdbServerStatus()])
         commands = _ServerCommands(_attempt())
-        bus, observation, scheduler, supervisor = self._supervisor(
-            reader, commands, ["started"]
-        )
+        bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started"])
         first = supervisor.start()
         calls_after_initialization = reader.calls
-
         bus.publish(
             AdbTransportInventoryObservationFailed(
-                _configuration().endpoint,
-                first,
-                AdbTransportInventoryObservationFailure.PROTOCOL,
+                _endpoint(), first, AdbTransportInventoryObservationFailure.PROTOCOL
             )
         )
-
         self.assertEqual(observation.generation, 1)
         self.assertEqual(reader.calls, calls_after_initialization)
         self.assertEqual(commands.started, [])
