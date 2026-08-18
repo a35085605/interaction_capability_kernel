@@ -108,11 +108,10 @@ ADB-domain fact/query
 
 `adb.server.lifecycle` owns server-availability composition such as
 `AdbServerEnsureAvailable` and `AdbServerEnsureUnavailable`, including the bounded
-`AdbServerEnsureOrchestrator`. Long-lived transport-observation lifecycle supervision lives
-under `adb.supervision` rather than under the server noun slice. `adb.transport.orchestration`
-owns transport preparation/recovery requests keyed by `AdbServerEndpoint` and
-`AdbDeviceSerial`. When orchestration performs multiple native attempts, its result preserves
-those attempts individually rather than collapsing them into one `NativeAttemptResult`.
+`AdbServerEnsureOrchestrator`. `adb.supervision` owns long-lived transport-observation
+lifecycle supervision. `adb.transport.orchestration` owns transport preparation/recovery
+requests keyed by `AdbServerEndpoint` and `AdbDeviceSerial`. When orchestration performs
+multiple native attempts, its result preserves each attempt individually.
 
 Transport preparation keeps **responsibilities separate while keeping one episode**:
 

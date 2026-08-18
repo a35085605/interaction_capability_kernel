@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass
 from numbers import Integral
-from typing import Protocol
 
 from adb.server.endpoint import AdbServerEndpoint
 from adb.errors import (
@@ -12,7 +10,6 @@ from adb.errors import (
     AdbServerConnectionError,
     AdbServiceError,
 )
-from adb.transport.devices.domain import AdbDevicesSnapshot
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -55,20 +52,7 @@ class AdbObservationProtocolError(AdbObservationError, AdbProtocolError):
     """ADB observation data violated the expected smart-socket protocol."""
 
 
-class AdbDevicesSnapshotSource(Protocol):
-    """Long-lived source of ADB transport-inventory snapshots."""
-
-    def snapshots(self) -> Iterator[AdbDevicesSnapshot]:
-        """Yield complete snapshots until the source is closed or exhausted."""
-        ...
-
-    def close(self) -> None:
-        """Permanently close the source and interrupt an active blocking session."""
-        ...
-
-
 __all__ = [
-    "AdbDevicesSnapshotSource",
     "AdbObservationError",
     "AdbObservationProtocolError",
     "AdbObservationServerConnectionError",

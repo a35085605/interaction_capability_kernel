@@ -14,10 +14,9 @@ producer                         event bus                         consumer
    │◄──────────── new signals ──────┴────────────────────────────────┘
 ```
 
-The bus is not a coordinator. It does not make cross-domain availability or backend-selection
-decisions, retry native operations, or interpret application effects. A domain-local supervisor
-may consume signals and invoke same-domain queries, commands, orchestration, and scheduling
-policy.
+Cross-domain availability, backend selection, native retry, and application-effect semantics
+remain outside `eventing`. A domain-local supervisor may consume signals and invoke same-domain
+queries, commands, orchestration, and scheduling policy.
 
 ## In-process adapter
 
@@ -38,9 +37,8 @@ persistence/replay, and cross-process backpressure remain external extensions.
 ## Scheduling boundary
 
 `ThreadingTemporalScheduler` is a concrete in-process implementation of `TemporalScheduler`.
-Timers publish their configured data event through an `EventPublisher`; they never invoke domain
-control effects directly. Domain supervisors remain responsible for deciding what a due event
-means and which command, query, or orchestration operation to execute.
+Timers publish their configured data event through an `EventPublisher`. Domain supervisors decide
+what a due event means and which command, query, or orchestration operation to execute.
 
 ## ADB transport-inventory observation supervision
 

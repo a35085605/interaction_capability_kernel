@@ -132,17 +132,6 @@ class AdbTrackDevicesSource:
             self._release_session(session_socket)
             raise
 
-    def snapshots(self) -> Iterator[AdbDevicesSnapshot]:
-        """Backward-compatible iterator over one established tracker session."""
-
-        session = self.open()
-        if session is None:
-            return
-        try:
-            yield from session.snapshots()
-        finally:
-            session.close()
-
     def _acquire_session(self) -> bool:
         with self._lock:
             if self._closed:

@@ -1,7 +1,6 @@
 """Long-lived observation of the ADB server's transport inventory."""
 
 from adb.transport.observation.contracts import (
-    AdbDevicesSnapshotSource,
     AdbObservationError,
     AdbObservationProtocolError,
     AdbObservationServerConnectionError,
@@ -21,7 +20,6 @@ from adb.transport.observation.runner import (
 )
 
 __all__ = [
-    "AdbDevicesSnapshotSource",
     "AdbObservationError",
     "AdbObservationProtocolError",
     "AdbObservationServerConnectionError",

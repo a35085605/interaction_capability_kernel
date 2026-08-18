@@ -34,7 +34,6 @@ from adb.transport.devices import (
     AdbTrackedDeviceLookup,
 )
 from adb.transport.observation import (
-    AdbDevicesSnapshotSource,
     AdbObservationError,
     AdbObservationProtocolError,
     AdbObservationServerConnectionError,
@@ -50,7 +49,6 @@ __all__ = [
     "AdbDeviceSerial",
     "AdbDevicesSnapshot",
     "AdbDevicesSnapshotReader",
-    "AdbDevicesSnapshotSource",
     "AdbObservationError",
     "AdbObservationProtocolError",
     "AdbObservationServerConnectionError",
