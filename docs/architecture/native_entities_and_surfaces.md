@@ -31,15 +31,12 @@ base classes or a cross-platform hierarchy.
 | Android logical display surface | `AndroidDisplaySurface` | via `AndroidDisplayState.surface` |
 
 ADB host facts follow AOSP host-protocol vocabulary. `AdbTrackedDevice` is one wire-aligned
-observation row in the ADB server's transport inventory, not a separate entity with its own
-identity, lifecycle, or commands. `AdbTrackedDevice.transport_id` is an `AdbTransportId` for
-non-zero native IDs; the protobuf default remains integer zero. A non-zero transport ID is a
-server-local runtime identity, not a durable configuration key. A row with transport ID zero
-does not establish stable native identity. The observation layer therefore publishes complete
-inventory snapshots rather than row lifecycle events. Different non-zero transport IDs denote
-different runtime transport instances; a serial-selected binding may still re-resolve the same
-serial to a different current transport from fresh inventory without treating those runtime IDs
-as one continuous transport identity.
+observation row in the ADB server's transport inventory. A non-zero
+`AdbTrackedDevice.transport_id` is its server-local native runtime transport identity; the
+protobuf default zero means that runtime identity is unavailable in the row. The observation
+layer publishes complete inventory snapshots. Different non-zero transport IDs denote different
+runtime transport instances; a serial-selected binding may re-resolve the same serial to a
+different current transport from fresh inventory.
 
 `AdbDeviceSerial`, `AdbTransportId`, `AdbTransportBySerial`, and `AdbTransportById` live under
 `adb.transport` and provide deterministic native transport selection. Serial is the persistent
@@ -47,10 +44,10 @@ native selection key used by configured transport bindings. Serial-selected bind
 re-resolved from fresh inventory as current facts change. `AdbTransportId` is the native
 server-local runtime identity: it may be derived from fresh inventory and used when a caller
 explicitly wants exact runtime-transport selection, but it is not a durable configuration key.
-`AdbTransportFeatures` preserves the transport's advertised feature names as an open set; it is
-not a kernel-defined closed capability enum. `AdbServerEndpoint` is the native ADB server
-identity used by ADB queries, commands, observation, and orchestration. Caller-owned logical
-server ids and the mapping from those ids to endpoints remain outside the ADB domain.
+`AdbTransportFeatures` is an open set of advertised native feature names. `AdbServerEndpoint` is
+the native ADB server identity used by ADB queries, commands, observation, and orchestration.
+Caller-owned logical server ids and the mapping from those ids to endpoints remain outside the
+ADB domain.
 
 Android framework/runtime facts are owned by the `android` domain. `AndroidDisplayId` is a
 logical framework display identity. `AndroidPhysicalDisplayId` is the SurfaceFlinger physical
@@ -77,7 +74,7 @@ A native query contract only asserts facts its own domain can obtain. For exampl
 - Desktop may identify the foreground `WindowId` without owning detailed `WindowState`;
 - Window may report visibility/minimized/client geometry without asserting Desktop foreground ownership;
 - ADB host readers may report server status, transport inventory, and selected-transport feature facts without aggregating Android runtime state;
-- the derived `AdbTrackedDeviceLookup` finds a row from a fresh complete inventory snapshot rather than inventing a separate native ADB row service;
+- `AdbTrackedDeviceLookup` derives one matching row from a fresh complete inventory snapshot;
 - Android ADB inspectors independently acquire build, boot, display, user/profile, package,
   launcher/activity, WindowManager geometry/insets, power, and keyguard facts without aggregating them into a cross-domain runtime state;
 - no native query decides whether a caller-defined logical interaction target exists.

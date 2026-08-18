@@ -78,7 +78,8 @@ The repository provides reusable contracts and data models for:
 - geometry, raster, crop, resize, and transform math.
 
 Atomic native queries are owned by their native domains. ADB host-side read contracts name the
-fact they return; derived singular selection is a lookup rather than an inspector:
+fact they return; `AdbTrackedDeviceLookup` derives singular selection from a fresh complete
+inventory snapshot:
 
 ```python
 from windows.query import DesktopInspector, WindowInspector
@@ -149,8 +150,7 @@ queries live under `android.adb`.
 
 ## ADB host facts and configuration
 
-The low-level ADB host model follows AOSP host protocol vocabulary rather than inventing a
-parallel transport/device state hierarchy:
+The low-level ADB host model uses AOSP host protocol vocabulary:
 
 ```text
 AdbServerStatus       adb_host.proto.AdbServerStatus payload
@@ -160,25 +160,21 @@ AdbConnectionState    adb_host.proto.ConnectionState values
 AdbConnectionType     adb_host.proto.ConnectionType values
 ```
 
-`AdbTrackedDevice` intentionally keeps the AOSP wire vocabulary, but it is not an independently
-identified device entity. It is one observation row for a server-tracked ADB transport and has
-no separate lifecycle or command surface. A non-zero `AdbTrackedDevice.transport_id` is the
-server-local native transport identity; the protobuf default `0` means that identity is not
-available in that row. The observation layer publishes complete inventory snapshots rather
-than synthesizing row lifecycle events. Different non-zero transport IDs denote different
-runtime transport instances; a serial-selected binding may nevertheless re-resolve the same
-serial to a different current transport from fresh inventory. Rows with transport ID zero do
-not establish stable native runtime identity.
+`AdbTrackedDevice` is one wire-aligned observation row for a server-tracked ADB transport. A
+non-zero `AdbTrackedDevice.transport_id` is the server-local native runtime transport identity;
+the protobuf default zero means that runtime identity is unavailable in the row. The observation
+layer publishes complete inventory snapshots. Different non-zero transport IDs denote different
+runtime transport instances; a serial-selected binding may re-resolve the same serial to a
+different current transport from fresh inventory.
 
 `AdbServerEndpoint` is the ADB-domain identity of one smart-socket server endpoint and is the
 server value consumed by host-side ADB queries, commands, observation, and same-domain
-orchestration. Caller-owned logical server ids and their `server_id -> AdbServerEndpoint`
-association stay in external composition rather than in the ADB domain. `AdbDeviceSerial` is
-the persistent native selection key for configured ADB transports. `AdbTransportId` is a
-server-local runtime identity derived from fresh inventory evidence; it is not a durable
-configuration key.
-`AdbTransportFeatures` is a selected-transport fact with an open native feature vocabulary.
-Android runtime facts are not folded into `AdbTrackedDevice`.
+orchestration. External composition owns caller logical server ids and their association with
+`AdbServerEndpoint`. `AdbDeviceSerial` is the persistent native selection key for configured ADB
+transports. `AdbTransportId` is a server-local runtime identity derived from fresh inventory
+evidence; it is not a durable configuration key. `AdbTransportFeatures` is a selected-transport
+fact with an open native feature vocabulary. Android runtime facts remain Android-owned and are
+acquired through `android.adb`.
 
 `AdbTransportBindingConfiguration` associates one ADB server endpoint with an `AdbDeviceSerial`
 and an optional TCP connect address. The serial is deliberately independent from the connect
@@ -186,18 +182,17 @@ address; preparation does not assume that the string passed to `adb connect` mus
 tracker serial. Runtime `transport_id` values remain fresh inventory facts rather than binding
 configuration or implicit preparation continuity state.
 
-Concrete ADB-backed adapters share a private smart-socket service client. The client is not
-a public raw-shell capability: public queries, capture backends, platform commands, and
-execution adapters remain typed by their owning domains or capabilities.
+Concrete ADB-backed adapters share a private smart-socket service client. Public queries,
+capture backends, platform commands, and execution adapters expose typed contracts owned by
+their domains or capabilities.
 
 `adb.server.status` owns server-status facts and the atomic status reader.
 `adb.server.lifecycle` owns atomic `AdbServerStart` / `AdbServerStop` commands plus the bounded
-server-availability ensure vocabulary and executor; sharing the noun namespace does not weaken
-the one-native-attempt rule for its atomic commands. `adb.pairing.command` owns one-attempt
-wireless pairing/trust establishment. `adb.transport.connection` owns one-attempt transport
-connection mutations while `adb.transport.orchestration` owns preparation/recovery composition
-vocabulary. Domain orchestration must not hide multiple native attempts inside one
-`NativeAttemptResult`.
+server-availability ensure vocabulary and executor. Atomic server commands still represent one
+native attempt. `adb.pairing.command` owns one-attempt wireless pairing/trust establishment.
+`adb.transport.connection` owns one-attempt transport connection mutations while
+`adb.transport.orchestration` owns preparation/recovery composition vocabulary. Domain
+orchestration preserves the evidence for each native attempt it performs.
 
 Transport preparation is one bounded episode with two distinct gates. The **presence gate**
 resolves the configured binding against complete inventory snapshots and is satisfied by a

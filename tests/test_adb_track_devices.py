@@ -211,12 +211,27 @@ class AdbTrackDevicesTests(unittest.TestCase):
             ),
         )
 
+    def _consume_session(self, source: AdbTrackDevicesSource) -> tuple[AdbDevicesSnapshot, ...]:
+        session = source.open()
+        self.assertIsNotNone(session)
+        assert session is not None
+        try:
+            return tuple(session.snapshots())
+        finally:
+            session.close()
+
     def _collect_to_eof(self, source: AdbTrackDevicesSource):
         snapshots: list[AdbDevicesSnapshot] = []
-        with self.assertRaises(AdbObservationServerConnectionError):
-            for snapshot in source.snapshots():
-                self.assertIsInstance(snapshot, AdbDevicesSnapshot)
-                snapshots.append(snapshot)
+        session = source.open()
+        self.assertIsNotNone(session)
+        assert session is not None
+        try:
+            with self.assertRaises(AdbObservationServerConnectionError):
+                for snapshot in session.snapshots():
+                    self.assertIsInstance(snapshot, AdbDevicesSnapshot)
+                    snapshots.append(snapshot)
+        finally:
+            session.close()
         return snapshots
 
     def test_public_models_validate_endpoint_and_timeout(self) -> None:
@@ -381,12 +396,9 @@ class AdbTrackDevicesTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 sock = _FakeSocket(b"OKAY" + _frame(payload))
                 getaddr_patch, socket_patch = self._patch_socket(sock)
-                observed = []
                 with getaddr_patch, socket_patch:
                     with self.assertRaises(AdbObservationProtocolError):
-                        for snapshot in AdbTrackDevicesSource().snapshots():
-                            observed.append(snapshot)
-                self.assertEqual(observed, [])
+                        self._consume_session(AdbTrackDevicesSource())
 
     def test_service_and_framing_failures_are_typed(self) -> None:
         cases = (
@@ -400,14 +412,14 @@ class AdbTrackDevicesTests(unittest.TestCase):
                 getaddr_patch, socket_patch = self._patch_socket(sock)
                 with getaddr_patch, socket_patch:
                     with self.assertRaises(error_type):
-                        tuple(AdbTrackDevicesSource().snapshots())
+                        self._consume_session(AdbTrackDevicesSource())
 
     def test_server_connection_failure_and_eof_remain_observation_failures(self) -> None:
         failed = _FakeSocket(connect_error=OSError("refused"))
         getaddr_patch, socket_patch = self._patch_socket(failed)
         with getaddr_patch, socket_patch:
             with self.assertRaises(AdbObservationServerConnectionError):
-                tuple(AdbTrackDevicesSource().snapshots())
+                self._consume_session(AdbTrackDevicesSource())
 
         payload = _devices(_device(serial="device-1", state=AdbConnectionState.DEVICE))
         sock = _FakeSocket(b"OKAY" + _frame(payload))
@@ -427,7 +439,7 @@ class AdbTrackDevicesTests(unittest.TestCase):
             side_effect=lambda: next(ticks),
         ):
             with self.assertRaises(AdbObservationServerConnectionError):
-                tuple(source.snapshots())
+                self._consume_session(source)
 
         finite = [value for value in sock.timeouts if value is not None]
         self.assertEqual(finite[:3], [4.0, 3.0, 2.0])
@@ -436,16 +448,20 @@ class AdbTrackDevicesTests(unittest.TestCase):
         sock = _BlockingReadSocket()
         getaddr_patch, socket_patch = self._patch_socket(sock)
         source = AdbTrackDevicesSource()
-        iterator = source.snapshots()
         result: list[object] = []
 
-        def consume() -> None:
-            try:
-                result.append(next(iterator))
-            except StopIteration:
-                result.append("stopped")
-
         with getaddr_patch, socket_patch:
+            session = source.open()
+            self.assertIsNotNone(session)
+            assert session is not None
+            iterator = session.snapshots()
+
+            def consume() -> None:
+                try:
+                    result.append(next(iterator))
+                except StopIteration:
+                    result.append("stopped")
+
             thread = Thread(target=consume)
             thread.start()
             self.assertTrue(sock.blocked.wait(1))
@@ -454,29 +470,32 @@ class AdbTrackDevicesTests(unittest.TestCase):
             thread.join(2)
 
         self.assertEqual(result, ["stopped"])
-        self.assertEqual(tuple(source.snapshots()), ())
+        self.assertIsNone(source.open())
         self.assertGreaterEqual(sock.shutdown_calls, 1)
 
     def test_concurrent_consumption_is_rejected_until_session_failure_cleans_up(self) -> None:
         sock = _BlockingReadSocket()
         getaddr_patch, socket_patch = self._patch_socket(sock)
         source = AdbTrackDevicesSource()
-        first = source.snapshots()
         result: list[object] = []
 
-        def consume() -> None:
-            try:
-                result.append(next(first))
-            except Exception as exc:  # pragma: no cover - assertion below checks type
-                result.append(exc)
-
         with getaddr_patch, socket_patch:
+            first_session = source.open()
+            self.assertIsNotNone(first_session)
+            assert first_session is not None
+            first = first_session.snapshots()
+
+            def consume() -> None:
+                try:
+                    result.append(next(first))
+                except Exception as exc:  # pragma: no cover - assertion below checks type
+                    result.append(exc)
+
             thread = Thread(target=consume)
             thread.start()
             self.assertTrue(sock.blocked.wait(1))
-            second = source.snapshots()
             with self.assertRaisesRegex(RuntimeError, "already active"):
-                next(second)
+                source.open()
             source.close()
             thread.join(2)
 

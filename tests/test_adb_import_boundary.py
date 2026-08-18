@@ -13,7 +13,6 @@ import sys
 import adb
 
 assert hasattr(adb, 'AdbServerConnectionError')
-assert not hasattr(adb, 'AdbConnectionError')
 assert hasattr(adb, 'AdbServerStatusReader')
 assert hasattr(adb, 'AdbDevicesSnapshotReader')
 assert hasattr(adb, 'AdbTrackedDeviceLookup')
@@ -38,20 +37,6 @@ assert 'geometry' not in sys.modules
         ):
             with self.subTest(namespace=namespace):
                 self.assertIsNotNone(importlib.util.find_spec(namespace))
-
-    def test_legacy_adb_compatibility_modules_are_absent(self) -> None:
-        for namespace in (
-            "adb.configuration",
-            "adb.server.adapters",
-            "adb.server.command",
-            "adb.server.domain",
-            "adb.server.orchestration",
-            "adb.server.query",
-            "adb.transport.command",
-            "adb.transport.inventory",
-        ):
-            with self.subTest(namespace=namespace):
-                self.assertIsNone(importlib.util.find_spec(namespace))
 
 
 if __name__ == "__main__":

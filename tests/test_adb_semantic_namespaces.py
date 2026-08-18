@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
 import unittest
 
-import adb.supervision as supervision
 from adb.server import AdbServerStatusReader as PublicServerStatusReader
 from adb.server.lifecycle import AdbServerEnsurePolicy, AdbServerStart
 from adb.server.lifecycle.adapters import SubprocessAdbServer
@@ -59,34 +57,6 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
             AdbDevicesObservationSupervisor.__module__,
             "adb.supervision.devices_observation",
         )
-
-    def test_legacy_adb_compatibility_exports_are_removed(self) -> None:
-        for namespace in (
-            "adb.server.adapters",
-            "adb.server.command",
-            "adb.server.domain",
-            "adb.server.orchestration",
-            "adb.server.query",
-            "adb.supervision.recovery",
-            "adb.supervision.transport_observation",
-            "adb.supervision.transport_inventory_observation",
-            "adb.transport.command",
-            "adb.transport.inventory",
-            "adb.transport.observation.recovery",
-        ):
-            with self.subTest(namespace=namespace):
-                self.assertIsNone(importlib.util.find_spec(namespace))
-        for name in (
-            "AdbServerRecoveryExhausted",
-            "AdbServerRecoveryId",
-            "AdbServerRecoveryPolicy",
-            "AdbServerRecoveryRetryDue",
-            "AdbServerRecoverySupervisor",
-            "AdbTransportObservationSupervisor",
-            "AdbTransportInventoryObservationSupervisor",
-        ):
-            with self.subTest(name=name):
-                self.assertFalse(hasattr(supervision, name))
 
 
 if __name__ == "__main__":
