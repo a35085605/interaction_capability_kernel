@@ -7,6 +7,11 @@ import adb.supervision as supervision
 from adb.server import AdbServerStatusReader as PublicServerStatusReader
 from adb.server.lifecycle import AdbServerEnsurePolicy, AdbServerStart
 from adb.server.lifecycle.adapters import SubprocessAdbServer
+from adb.server.provisioning import (
+    AdbServerProvisioner,
+    InMemoryAdbServerProvisioner,
+    SequentialLocalAdbServerEndpointAllocator,
+)
 from adb.server.status import AdbServerStatus, AdbServerStatusReader
 from adb.supervision import (
     AdbTransportInventoryObservationSupervisionPolicy,
@@ -27,6 +32,14 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
         self.assertEqual(SubprocessAdbServer.__module__, "adb.server.lifecycle.adapters")
         self.assertEqual(AdbServerEnsurePolicy.__module__, "adb.server.lifecycle.ensure")
         self.assertEqual(AdbServerEnsurePolicy(1.0, 0.1).timeout_seconds, 1.0)
+
+    def test_server_provisioning_namespace_is_canonical(self) -> None:
+        self.assertEqual(AdbServerProvisioner.__module__, "adb.server.provisioning")
+        self.assertEqual(InMemoryAdbServerProvisioner.__module__, "adb.server.provisioning")
+        self.assertEqual(
+            SequentialLocalAdbServerEndpointAllocator.__module__,
+            "adb.server.provisioning",
+        )
 
     def test_transport_connection_namespace_is_canonical(self) -> None:
         self.assertEqual(AdbTcpConnect.__module__, "adb.transport.connection.command")
