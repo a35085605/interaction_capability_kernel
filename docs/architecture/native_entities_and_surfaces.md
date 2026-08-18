@@ -40,13 +40,14 @@ inventory snapshots rather than row lifecycle events. Any future projector must 
 continuity across different non-zero transport IDs.
 
 `AdbDeviceSerial`, `AdbTransportId`, `AdbTransportBySerial`, and `AdbTransportById` live under
-`adb.transport` and provide deterministic native transport selection. Serial is a native
-selection key; `AdbTransportId` is the native server-local runtime identity.
-`AdbTransportFeatures` preserves the transport's advertised feature names as an open set; it
-is not a kernel-defined closed capability enum. `AdbServerId` and `AdbTransportBindingId` are
-caller-owned configuration identities under `adb.configuration`, not fields of native ADB
-state. `AdbServerConfiguration` binds one server identity to the smart-socket endpoint used by
-ADB queries, commands, and orchestration.
+`adb.transport` and provide deterministic native transport selection. Serial is the persistent
+native selection key used by configured transport bindings. `AdbTransportId` is the native
+server-local runtime identity: it may be derived from fresh inventory and used for bounded
+runtime pinning, but it is not a durable configuration key. `AdbTransportFeatures` preserves
+the transport's advertised feature names as an open set; it is not a kernel-defined closed
+capability enum. `AdbServerId` is a caller-owned configuration identity under
+`adb.configuration`, not a field of native ADB state. `AdbServerConfiguration` binds one server
+identity to the smart-socket endpoint used by ADB queries, commands, and orchestration.
 
 Android framework/runtime facts are owned by the `android` domain. `AndroidDisplayId` is a
 logical framework display identity. `AndroidPhysicalDisplayId` is the SurfaceFlinger physical
