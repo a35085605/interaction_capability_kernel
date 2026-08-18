@@ -18,13 +18,13 @@ from adb.transport.binding import (
     AdbTransportBindingResolutionStatus,
     resolve_transport_binding,
 )
-from adb.transport.inventory.domain import AdbDevicesSnapshot
-from adb.transport.inventory.query import AdbDevicesSnapshotReader
+from adb.transport.devices.domain import AdbDevicesSnapshot
+from adb.transport.devices.query import AdbDevicesSnapshotReader
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.runner import AdbTransportInventoryObservationController
+from adb.transport.observation.runner import AdbDevicesObservationController
 from adb.transport.observation.signal import (
-    AdbTransportInventoryObservationStarted,
-    AdbTransportInventorySnapshotObserved,
+    AdbDevicesObservationStarted,
+    AdbDevicesSnapshotObserved,
 )
 from adb.transport.selection import AdbDeviceSerial
 from adb.transport.orchestration import (
@@ -77,7 +77,7 @@ class AdbTransportBindingSupervisor:
         self,
         endpoint: AdbServerEndpoint,
         event_bus: EventBus,
-        observation: AdbTransportInventoryObservationController,
+        observation: AdbDevicesObservationController,
         snapshot_reader: AdbDevicesSnapshotReader,
         preparation_factory: _PreparationFactory,
         *,
@@ -89,8 +89,8 @@ class AdbTransportBindingSupervisor:
             getattr(event_bus, "subscribe", None)
         ) or not callable(getattr(event_bus, "unsubscribe", None)):
             raise TypeError("event_bus must satisfy EventBus")
-        if not isinstance(observation, AdbTransportInventoryObservationController):
-            raise TypeError("observation must satisfy AdbTransportInventoryObservationController")
+        if not isinstance(observation, AdbDevicesObservationController):
+            raise TypeError("observation must satisfy AdbDevicesObservationController")
         if not callable(getattr(snapshot_reader, "read", None)):
             raise TypeError("snapshot_reader must provide read()")
         if not callable(preparation_factory):
@@ -113,11 +113,11 @@ class AdbTransportBindingSupervisor:
             if self._subscriptions:
                 raise RuntimeError("transport binding supervisor is already started")
             started = self._bus.subscribe(
-                AdbTransportInventoryObservationStarted,
+                AdbDevicesObservationStarted,
                 self._on_observation_started,
             )
             snapshots = self._bus.subscribe(
-                AdbTransportInventorySnapshotObserved,
+                AdbDevicesSnapshotObserved,
                 self._on_snapshot_observed,
             )
             self._subscriptions = (started, snapshots)
@@ -198,7 +198,7 @@ class AdbTransportBindingSupervisor:
             return
         self._apply_snapshot(session_id, snapshot, serial=serial)
 
-    def _on_observation_started(self, event: AdbTransportInventoryObservationStarted) -> None:
+    def _on_observation_started(self, event: AdbDevicesObservationStarted) -> None:
         if event.session_id.endpoint != self.endpoint:
             return
         with self._lock:
@@ -209,7 +209,7 @@ class AdbTransportBindingSupervisor:
                 registration.session_id = event.session_id
                 registration.recovery_attempted_for_absence = False
 
-    def _on_snapshot_observed(self, event: AdbTransportInventorySnapshotObserved) -> None:
+    def _on_snapshot_observed(self, event: AdbDevicesSnapshotObserved) -> None:
         if event.session_id.endpoint != self.endpoint:
             return
         self._apply_snapshot(event.session_id, event.snapshot)

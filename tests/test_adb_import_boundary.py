@@ -29,7 +29,7 @@ assert 'geometry' not in sys.modules
             "adb.server.lifecycle",
             "adb.transport",
             "adb.transport.connection",
-            "adb.transport.inventory",
+            "adb.transport.devices",
             "adb.transport.observation",
             "adb.transport.orchestration",
             "adb.server.signal",
@@ -48,6 +48,7 @@ assert 'geometry' not in sys.modules
             "adb.server.orchestration",
             "adb.server.query",
             "adb.transport.command",
+            "adb.transport.inventory",
         ):
             with self.subTest(namespace=namespace):
                 self.assertIsNone(importlib.util.find_spec(namespace))

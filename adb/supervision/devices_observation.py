@@ -8,24 +8,24 @@ from threading import Lock, Thread, current_thread
 from adb.server.endpoint import AdbServerEndpoint
 from adb.server.lifecycle import AdbServerEnsureOrchestrator
 from adb.supervision.model import (
-    AdbTransportInventoryObservationEstablishmentCycleId,
-    AdbTransportInventoryObservationSupervisionPolicy,
+    AdbDevicesObservationEstablishmentCycleId,
+    AdbDevicesObservationSupervisionPolicy,
 )
 from adb.supervision.signal import (
-    AdbTransportInventoryObservationEstablishmentExhausted,
-    AdbTransportInventoryObservationEstablishmentRetryDue,
+    AdbDevicesObservationEstablishmentExhausted,
+    AdbDevicesObservationEstablishmentRetryDue,
 )
 from adb.transport.observation.establishment import (
-    AdbTransportInventoryObservationEstablishment,
-    AdbTransportInventoryObservationEstablishmentOrchestrator,
-    AdbTransportInventoryObservationEstablishmentPolicy,
-    AdbTransportInventoryObservationEstablishmentResult,
-    AdbTransportInventoryObservationEstablishmentStatus,
+    AdbDevicesObservationEstablishment,
+    AdbDevicesObservationEstablishmentOrchestrator,
+    AdbDevicesObservationEstablishmentPolicy,
+    AdbDevicesObservationEstablishmentResult,
+    AdbDevicesObservationEstablishmentStatus,
 )
-from adb.transport.observation.runner import AdbTransportInventoryObservationController
+from adb.transport.observation.runner import AdbDevicesObservationController
 from adb.transport.observation.signal import (
-    AdbTransportInventoryObservationFailed,
-    AdbTransportInventoryObservationFailure,
+    AdbDevicesObservationFailed,
+    AdbDevicesObservationFailure,
 )
 from eventing import EventBus, EventSubscriptionToken
 from scheduling import ScheduleToken, TemporalScheduler
@@ -41,7 +41,7 @@ def _default_thread_factory(*args, **kwargs) -> Thread:
     return thread
 
 
-class AdbTransportInventoryObservationSupervisor:
+class AdbDevicesObservationSupervisor:
     """Long-lived supervisor for one configured server's transport-inventory observation.
 
     Startup initialization and runtime server-connection failure both use the same bounded
@@ -54,10 +54,10 @@ class AdbTransportInventoryObservationSupervisor:
         self,
         endpoint: AdbServerEndpoint,
         event_bus: EventBus,
-        observation: AdbTransportInventoryObservationController,
+        observation: AdbDevicesObservationController,
         ensure_orchestrator: AdbServerEnsureOrchestrator,
         scheduler: TemporalScheduler[object],
-        policy: AdbTransportInventoryObservationSupervisionPolicy,
+        policy: AdbDevicesObservationSupervisionPolicy,
         *,
         _random: _RandomSource = random,
         _thread_factory: _ThreadFactory = _default_thread_factory,
@@ -68,21 +68,21 @@ class AdbTransportInventoryObservationSupervisor:
             getattr(event_bus, "subscribe", None)
         ):
             raise TypeError("event_bus must satisfy EventBus")
-        if not isinstance(observation, AdbTransportInventoryObservationController):
-            raise TypeError("observation must satisfy AdbTransportInventoryObservationController")
+        if not isinstance(observation, AdbDevicesObservationController):
+            raise TypeError("observation must satisfy AdbDevicesObservationController")
         if not isinstance(ensure_orchestrator, AdbServerEnsureOrchestrator):
             raise TypeError("ensure_orchestrator must be AdbServerEnsureOrchestrator")
         if not isinstance(scheduler, TemporalScheduler):
             raise TypeError("scheduler must satisfy TemporalScheduler")
-        if not isinstance(policy, AdbTransportInventoryObservationSupervisionPolicy):
+        if not isinstance(policy, AdbDevicesObservationSupervisionPolicy):
             raise TypeError(
-                "policy must be AdbTransportInventoryObservationSupervisionPolicy"
+                "policy must be AdbDevicesObservationSupervisionPolicy"
             )
         self.endpoint = endpoint
         self._bus = event_bus
         self._observation = observation
         self._ensure = ensure_orchestrator
-        self._establishment = AdbTransportInventoryObservationEstablishmentOrchestrator(
+        self._establishment = AdbDevicesObservationEstablishmentOrchestrator(
             endpoint,
             event_bus,
             observation,
@@ -95,7 +95,7 @@ class AdbTransportInventoryObservationSupervisor:
         self._lock = Lock()
         self._subscriptions: tuple[EventSubscriptionToken, ...] = ()
         self._current_session_id = observation.current_session_id
-        self._cycle_id: AdbTransportInventoryObservationEstablishmentCycleId | None = None
+        self._cycle_id: AdbDevicesObservationEstablishmentCycleId | None = None
         self._retry_token: ScheduleToken | None = None
         self._attempt_thread: Thread | None = None
         self._closed = False
@@ -114,20 +114,20 @@ class AdbTransportInventoryObservationSupervisor:
             if self._subscriptions:
                 raise RuntimeError("transport-inventory observation supervisor is already started")
             failure_token = self._bus.subscribe(
-                AdbTransportInventoryObservationFailed,
+                AdbDevicesObservationFailed,
                 self._on_observation_failed,
             )
             retry_token = self._bus.subscribe(
-                AdbTransportInventoryObservationEstablishmentRetryDue,
+                AdbDevicesObservationEstablishmentRetryDue,
                 self._on_retry_due,
             )
             self._subscriptions = (failure_token, retry_token)
-            cycle_id = AdbTransportInventoryObservationEstablishmentCycleId.new()
+            cycle_id = AdbDevicesObservationEstablishmentCycleId.new()
             self._cycle_id = cycle_id
 
         result = self._establish_once()
         self._handle_establishment_result(cycle_id, 1, result)
-        if result.status is AdbTransportInventoryObservationEstablishmentStatus.SATISFIED:
+        if result.status is AdbDevicesObservationEstablishmentStatus.SATISFIED:
             return result.observation_session_id
         return None
 
@@ -150,8 +150,8 @@ class AdbTransportInventoryObservationSupervisor:
         if attempt_thread is not None and attempt_thread is not current_thread():
             attempt_thread.join()
 
-    def _on_observation_failed(self, event: AdbTransportInventoryObservationFailed) -> None:
-        if event.failure is not AdbTransportInventoryObservationFailure.SERVER_CONNECTION:
+    def _on_observation_failed(self, event: AdbDevicesObservationFailed) -> None:
+        if event.failure is not AdbDevicesObservationFailure.SERVER_CONNECTION:
             return
         if event.session_id.endpoint != self.endpoint:
             return
@@ -161,13 +161,13 @@ class AdbTransportInventoryObservationSupervisor:
                 return
             if self._cycle_id is not None:
                 return
-            cycle_id = AdbTransportInventoryObservationEstablishmentCycleId.new()
+            cycle_id = AdbDevicesObservationEstablishmentCycleId.new()
             self._cycle_id = cycle_id
         self._launch_establishment_attempt(cycle_id, attempt_number=1)
 
     def _on_retry_due(
         self,
-        event: AdbTransportInventoryObservationEstablishmentRetryDue,
+        event: AdbDevicesObservationEstablishmentRetryDue,
     ) -> None:
         if event.endpoint != self.endpoint:
             return
@@ -179,7 +179,7 @@ class AdbTransportInventoryObservationSupervisor:
 
     def _launch_establishment_attempt(
         self,
-        cycle_id: AdbTransportInventoryObservationEstablishmentCycleId,
+        cycle_id: AdbDevicesObservationEstablishmentCycleId,
         attempt_number: int,
     ) -> None:
         thread = self._thread_factory(
@@ -200,7 +200,7 @@ class AdbTransportInventoryObservationSupervisor:
 
     def _run_establishment_attempt(
         self,
-        cycle_id: AdbTransportInventoryObservationEstablishmentCycleId,
+        cycle_id: AdbDevicesObservationEstablishmentCycleId,
         attempt_number: int,
     ) -> None:
         active = current_thread()
@@ -218,11 +218,11 @@ class AdbTransportInventoryObservationSupervisor:
             active_thread=active,
         )
 
-    def _establish_once(self) -> AdbTransportInventoryObservationEstablishmentResult:
+    def _establish_once(self) -> AdbDevicesObservationEstablishmentResult:
         return self._establishment.establish(
-            AdbTransportInventoryObservationEstablishment(
+            AdbDevicesObservationEstablishment(
                 self.endpoint,
-                AdbTransportInventoryObservationEstablishmentPolicy(
+                AdbDevicesObservationEstablishmentPolicy(
                     self._policy.episode_timeout_seconds,
                     self._policy.ensure_policy,
                 ),
@@ -231,13 +231,13 @@ class AdbTransportInventoryObservationSupervisor:
 
     def _handle_establishment_result(
         self,
-        cycle_id: AdbTransportInventoryObservationEstablishmentCycleId,
+        cycle_id: AdbDevicesObservationEstablishmentCycleId,
         attempt_number: int,
-        result: AdbTransportInventoryObservationEstablishmentResult,
+        result: AdbDevicesObservationEstablishmentResult,
         *,
         active_thread: Thread | None = None,
     ) -> None:
-        if result.status is AdbTransportInventoryObservationEstablishmentStatus.SATISFIED:
+        if result.status is AdbDevicesObservationEstablishmentStatus.SATISFIED:
             session_id = result.observation_session_id
             assert session_id is not None
             self._complete_establishment_cycle(
@@ -261,24 +261,24 @@ class AdbTransportInventoryObservationSupervisor:
 
     @staticmethod
     def _should_retry(
-        result: AdbTransportInventoryObservationEstablishmentResult,
+        result: AdbDevicesObservationEstablishmentResult,
     ) -> bool:
         failure = result.observation_failure
         return failure in (
             None,
-            AdbTransportInventoryObservationFailure.SERVER_CONNECTION,
+            AdbDevicesObservationFailure.SERVER_CONNECTION,
         )
 
     def _schedule_retry_or_exhaust(
         self,
-        cycle_id: AdbTransportInventoryObservationEstablishmentCycleId,
+        cycle_id: AdbDevicesObservationEstablishmentCycleId,
         attempt_number: int,
     ) -> None:
         max_attempts = self._policy.max_attempts
         if max_attempts is not None and attempt_number >= max_attempts:
             self._end_establishment_cycle(cycle_id)
             self._bus.publish(
-                AdbTransportInventoryObservationEstablishmentExhausted(
+                AdbDevicesObservationEstablishmentExhausted(
                     self.endpoint,
                     cycle_id,
                     attempt_number,
@@ -288,7 +288,7 @@ class AdbTransportInventoryObservationSupervisor:
 
         next_attempt = attempt_number + 1
         delay_seconds = self._retry_delay(attempt_number)
-        retry_event = AdbTransportInventoryObservationEstablishmentRetryDue(
+        retry_event = AdbDevicesObservationEstablishmentRetryDue(
             self.endpoint,
             cycle_id,
             next_attempt,
@@ -308,7 +308,7 @@ class AdbTransportInventoryObservationSupervisor:
 
     def _complete_establishment_cycle(
         self,
-        cycle_id: AdbTransportInventoryObservationEstablishmentCycleId,
+        cycle_id: AdbDevicesObservationEstablishmentCycleId,
         session_id,
         *,
         active_thread: Thread | None = None,
@@ -327,7 +327,7 @@ class AdbTransportInventoryObservationSupervisor:
 
     def _end_establishment_cycle(
         self,
-        cycle_id: AdbTransportInventoryObservationEstablishmentCycleId,
+        cycle_id: AdbDevicesObservationEstablishmentCycleId,
     ) -> None:
         with self._lock:
             if self._cycle_id != cycle_id:
@@ -354,4 +354,4 @@ class AdbTransportInventoryObservationSupervisor:
         return max(base * factor, 1e-6)
 
 
-__all__ = ["AdbTransportInventoryObservationSupervisor"]
+__all__ = ["AdbDevicesObservationSupervisor"]

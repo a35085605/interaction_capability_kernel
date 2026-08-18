@@ -12,7 +12,7 @@ from adb.errors import (
     AdbServerConnectionError,
     AdbServiceError,
 )
-from adb.transport.inventory.domain import AdbDevicesSnapshot
+from adb.transport.devices.domain import AdbDevicesSnapshot
 
 
 @dataclass(frozen=True, slots=True, order=True)

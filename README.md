@@ -83,7 +83,7 @@ fact they return; derived singular selection is a lookup rather than an inspecto
 ```python
 from windows.query import DesktopInspector, WindowInspector
 from adb.server.status import AdbServerStatusReader
-from adb.transport.inventory.query import (
+from adb.transport.devices.query import (
     AdbDevicesSnapshotReader,
     AdbTrackedDeviceLookup,
 )
@@ -128,7 +128,7 @@ from adb.server.lifecycle import (
     AdbServerEnsurePolicy,
     AdbServerEnsureResult,
 )
-from adb.supervision import AdbTransportInventoryObservationSupervisor
+from adb.supervision import AdbDevicesObservationSupervisor
 from adb.transport.binding import AdbTransportBindingConfiguration
 from adb.transport.orchestration import (
     AdbTransportPreparation,
@@ -143,7 +143,7 @@ Queries/readers and commands do not accept a cross-domain runtime target and do 
 facts from other native domains. Host-side ADB ownership is centered on `adb.server`, `adb.pairing`, and
 `adb.transport`; server status is under `adb.server.status`, server lifecycle under
 `adb.server.lifecycle`, transport connection mutations under `adb.transport.connection`, the
-server-observed transport inventory under `adb.transport.inventory`, and its long-lived
+server-observed transport inventory under `adb.transport.devices`, and its long-lived
 `track-devices` lifecycle under `adb.transport.observation`. ADB-backed Android framework
 queries live under `android.adb`.
 
@@ -220,22 +220,22 @@ manage transport connection state separately.
 `InMemoryEventBus` provides ordered in-process FIFO delivery. Domain signals remain immutable
 payloads owned by their domain; supervisors decide what those signals mean.
 
-`AdbTransportInventoryObservationRunner` establishes `track-devices` stream mode before emitting
-`AdbTransportInventoryObservationStarted`, emits complete snapshots through
-`AdbTransportInventorySnapshotObserved`, and attaches an
+`AdbDevicesObservationRunner` establishes `track-devices` stream mode before emitting
+`AdbDevicesObservationStarted`, emits complete snapshots through
+`AdbDevicesSnapshotObserved`, and attaches an
 `AdbObservationSessionId` containing the ADB server endpoint plus a monotonically increasing
 generation. A new generation establishes a new observation baseline; observation
 termination does not imply that transports disappeared.
 
 `AdbServerEnsureOrchestrator` lives under `adb.server.lifecycle` and provides the concrete
 probe / one atomic server command / fresh verification loop represented by the ensure vocabulary.
-`AdbTransportInventoryObservationEstablishmentOrchestrator` owns one bounded establishment
+`AdbDevicesObservationEstablishmentOrchestrator` owns one bounded establishment
 of a `track-devices` observation generation; server ensure is a sub-step when the configured
 server is observed as unavailable, and satisfaction requires matching
-`AdbTransportInventoryObservationStarted` evidence. `AdbTransportInventoryObservationSupervisor`
+`AdbDevicesObservationStarted` evidence. `AdbDevicesObservationSupervisor`
 lives under `adb.supervision`: it owns the long-lived establishment cycle across retry attempts
 and observation generations, consumes current-generation server-connection failures, and
-schedules `AdbTransportInventoryObservationEstablishmentRetryDue` data events with bounded
+schedules `AdbDevicesObservationEstablishmentRetryDue` data events with bounded
 exponential backoff and optional jitter. The scheduler only delivers the due event; control side
 effects remain in ADB supervision.
 

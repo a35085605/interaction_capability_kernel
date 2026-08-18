@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.transport.inventory.domain import AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices.domain import AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.selection import AdbDeviceSerial
 
 

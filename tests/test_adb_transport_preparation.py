@@ -6,9 +6,9 @@ import unittest
 from adb.server import AdbServerEndpoint
 from adb.transport.binding import AdbTransportBindingConfiguration, AdbTransportBindingResolutionStatus, resolve_transport_binding
 from adb.transport.connection import AdbTcpConnect
-from adb.transport.inventory import AdbConnectionState, AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices import AdbConnectionState, AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.signal import AdbTransportInventoryObservationStarted, AdbTransportInventorySnapshotObserved
+from adb.transport.observation.signal import AdbDevicesObservationStarted, AdbDevicesSnapshotObserved
 from adb.transport.orchestration import (
     AdbTransportPreparation,
     AdbTransportPreparationPolicy,
@@ -143,7 +143,7 @@ class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
         )
 
     def _publish(self, snapshot: AdbDevicesSnapshot) -> None:
-        self.bus.publish(AdbTransportInventorySnapshotObserved(_endpoint(), self.session_id, snapshot))
+        self.bus.publish(AdbDevicesSnapshotObserved(_endpoint(), self.session_id, snapshot))
 
     def test_already_ready_transport_skips_connect(self) -> None:
         connector = _Connector(_attempt())
@@ -239,7 +239,7 @@ class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
 
         def connect_and_restart(operation):
             result = original_connect(operation)
-            self.bus.publish(AdbTransportInventoryObservationStarted(_endpoint(), AdbObservationSessionId(_endpoint(), 8)))
+            self.bus.publish(AdbDevicesObservationStarted(_endpoint(), AdbObservationSessionId(_endpoint(), 8)))
             return result
 
         connector.connect = connect_and_restart  # type: ignore[method-assign]

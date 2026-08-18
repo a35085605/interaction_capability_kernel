@@ -19,12 +19,12 @@ from adb.server.lifecycle import (
     AdbServerProbeResult,
 )
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.runner import AdbTransportInventoryObservationController
+from adb.transport.observation.runner import AdbDevicesObservationController
 from adb.transport.observation.signal import (
-    AdbTransportInventoryObservationFailed,
-    AdbTransportInventoryObservationFailure,
-    AdbTransportInventoryObservationStarted,
-    AdbTransportInventoryObservationStopped,
+    AdbDevicesObservationFailed,
+    AdbDevicesObservationFailure,
+    AdbDevicesObservationStarted,
+    AdbDevicesObservationStopped,
 )
 from eventing import EventBus, EventSubscriptionToken
 from native_attempt import NativeAttemptResult
@@ -53,7 +53,7 @@ def _normalize_optional_text(value: object, *, field_name: str) -> str | None:
     return normalized
 
 
-class AdbTransportInventoryObservationEstablishmentStatus(str, Enum):
+class AdbDevicesObservationEstablishmentStatus(str, Enum):
     """Terminal status of one bounded transport-inventory observation establishment episode."""
 
     SATISFIED = "satisfied"
@@ -62,7 +62,7 @@ class AdbTransportInventoryObservationEstablishmentStatus(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationEstablishmentPolicy:
+class AdbDevicesObservationEstablishmentPolicy:
     """Bound one observation-establishment episode with explicit server-ensure policy."""
 
     timeout_seconds: float
@@ -82,50 +82,50 @@ class AdbTransportInventoryObservationEstablishmentPolicy:
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationEstablishment:
+class AdbDevicesObservationEstablishment:
     """Request establishment of one configured server's transport-inventory observation."""
 
     endpoint: AdbServerEndpoint
-    policy: AdbTransportInventoryObservationEstablishmentPolicy
+    policy: AdbDevicesObservationEstablishmentPolicy
 
     def __post_init__(self) -> None:
         if not isinstance(self.endpoint, AdbServerEndpoint):
             raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(
             self.policy,
-            AdbTransportInventoryObservationEstablishmentPolicy,
+            AdbDevicesObservationEstablishmentPolicy,
         ):
             raise TypeError(
-                "policy must be AdbTransportInventoryObservationEstablishmentPolicy"
+                "policy must be AdbDevicesObservationEstablishmentPolicy"
             )
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationEstablishmentResult:
+class AdbDevicesObservationEstablishmentResult:
     """Evidence from one bounded transport-inventory observation establishment episode."""
 
-    operation: AdbTransportInventoryObservationEstablishment
-    status: AdbTransportInventoryObservationEstablishmentStatus
+    operation: AdbDevicesObservationEstablishment
+    status: AdbDevicesObservationEstablishmentStatus
     initial_probe: AdbServerProbeResult
     ensure_result: AdbServerEnsureResult | None = None
     observation_session_id: AdbObservationSessionId | None = None
-    observation_failure: AdbTransportInventoryObservationFailure | None = None
+    observation_failure: AdbDevicesObservationFailure | None = None
     diagnostic: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(
             self.operation,
-            AdbTransportInventoryObservationEstablishment,
+            AdbDevicesObservationEstablishment,
         ):
             raise TypeError(
-                "operation must be AdbTransportInventoryObservationEstablishment"
+                "operation must be AdbDevicesObservationEstablishment"
             )
         if not isinstance(
             self.status,
-            AdbTransportInventoryObservationEstablishmentStatus,
+            AdbDevicesObservationEstablishmentStatus,
         ):
             raise TypeError(
-                "status must be AdbTransportInventoryObservationEstablishmentStatus"
+                "status must be AdbDevicesObservationEstablishmentStatus"
             )
         if not isinstance(self.initial_probe, AdbServerProbeResult):
             raise TypeError("initial_probe must be AdbServerProbeResult")
@@ -144,14 +144,14 @@ class AdbTransportInventoryObservationEstablishmentResult:
                 )
         if self.observation_failure is not None and not isinstance(
             self.observation_failure,
-            AdbTransportInventoryObservationFailure,
+            AdbDevicesObservationFailure,
         ):
             raise TypeError(
-                "observation_failure must be AdbTransportInventoryObservationFailure or None"
+                "observation_failure must be AdbDevicesObservationFailure or None"
             )
         if (
             self.status
-            is AdbTransportInventoryObservationEstablishmentStatus.SATISFIED
+            is AdbDevicesObservationEstablishmentStatus.SATISFIED
         ):
             if self.observation_session_id is None:
                 raise ValueError(
@@ -183,11 +183,11 @@ class AdbTransportInventoryObservationEstablishmentResult:
         )
 
 
-class AdbTransportInventoryObservationEstablishmentOrchestrator:
+class AdbDevicesObservationEstablishmentOrchestrator:
     """Establish one track-devices observation generation inside a bounded episode.
 
     The episode owns no retry/backoff state. Satisfaction requires matching
-    ``AdbTransportInventoryObservationStarted`` evidence, not merely acceptance of
+    ``AdbDevicesObservationStarted`` evidence, not merely acceptance of
     ``observation.start()``. Server ensure is a sub-step only when the configured server is
     freshly observed as unavailable.
     """
@@ -196,7 +196,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
         self,
         endpoint: AdbServerEndpoint,
         event_bus: EventBus,
-        observation: AdbTransportInventoryObservationController,
+        observation: AdbDevicesObservationController,
         ensure_orchestrator: object,
         *,
         _monotonic: _MonotonicClock = monotonic,
@@ -207,7 +207,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             getattr(event_bus, "unsubscribe", None)
         ):
             raise TypeError("event_bus must satisfy EventBus")
-        if not isinstance(observation, AdbTransportInventoryObservationController):
+        if not isinstance(observation, AdbDevicesObservationController):
             raise TypeError("observation must satisfy observation controller")
         if not callable(getattr(ensure_orchestrator, "probe", None)) or not callable(
             getattr(ensure_orchestrator, "ensure", None)
@@ -221,14 +221,14 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
 
     def establish(
         self,
-        operation: AdbTransportInventoryObservationEstablishment,
-    ) -> AdbTransportInventoryObservationEstablishmentResult:
+        operation: AdbDevicesObservationEstablishment,
+    ) -> AdbDevicesObservationEstablishmentResult:
         if not isinstance(
             operation,
-            AdbTransportInventoryObservationEstablishment,
+            AdbDevicesObservationEstablishment,
         ):
             raise TypeError(
-                "operation must be AdbTransportInventoryObservationEstablishment"
+                "operation must be AdbDevicesObservationEstablishment"
             )
         if operation.endpoint != self.endpoint:
             raise ValueError("operation endpoint does not match configured ADB server endpoint")
@@ -251,18 +251,18 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
 
     def _run_episode(
         self,
-        operation: AdbTransportInventoryObservationEstablishment,
+        operation: AdbDevicesObservationEstablishment,
         deadline: float,
         condition: Condition,
         events: deque[object],
-    ) -> AdbTransportInventoryObservationEstablishmentResult:
+    ) -> AdbDevicesObservationEstablishmentResult:
         initial_probe = self._ensure.probe()
         ensure_result: AdbServerEnsureResult | None = None
 
         if initial_probe.availability is AdbServerAvailability.INDETERMINATE:
             return self._complete(
                 operation,
-                AdbTransportInventoryObservationEstablishmentStatus.FAILED,
+                AdbDevicesObservationEstablishmentStatus.FAILED,
                 initial_probe,
                 diagnostic=initial_probe.diagnostic or "ADB server availability is indeterminate",
             )
@@ -272,7 +272,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             if remaining <= 0.0:
                 return self._complete(
                     operation,
-                    AdbTransportInventoryObservationEstablishmentStatus.TIMED_OUT,
+                    AdbDevicesObservationEstablishmentStatus.TIMED_OUT,
                     initial_probe,
                     diagnostic="establishment deadline expired before server ensure",
                 )
@@ -286,9 +286,9 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             )
             if ensure_result.status is not AdbServerEnsureStatus.SATISFIED:
                 status = (
-                    AdbTransportInventoryObservationEstablishmentStatus.TIMED_OUT
+                    AdbDevicesObservationEstablishmentStatus.TIMED_OUT
                     if ensure_result.status is AdbServerEnsureStatus.TIMED_OUT
-                    else AdbTransportInventoryObservationEstablishmentStatus.FAILED
+                    else AdbDevicesObservationEstablishmentStatus.FAILED
                 )
                 return self._complete(
                     operation,
@@ -304,7 +304,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
         if deadline - self._monotonic() <= 0.0:
             return self._complete(
                 operation,
-                AdbTransportInventoryObservationEstablishmentStatus.TIMED_OUT,
+                AdbDevicesObservationEstablishmentStatus.TIMED_OUT,
                 initial_probe,
                 ensure_result=ensure_result,
                 diagnostic="establishment deadline expired before observation start",
@@ -315,7 +315,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
         except RuntimeError as exc:
             return self._complete(
                 operation,
-                AdbTransportInventoryObservationEstablishmentStatus.FAILED,
+                AdbDevicesObservationEstablishmentStatus.FAILED,
                 initial_probe,
                 ensure_result=ensure_result,
                 diagnostic=str(exc),
@@ -328,7 +328,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             if event is None:
                 return self._complete(
                     operation,
-                    AdbTransportInventoryObservationEstablishmentStatus.TIMED_OUT,
+                    AdbDevicesObservationEstablishmentStatus.TIMED_OUT,
                     initial_probe,
                     ensure_result=ensure_result,
                     observation_session_id=session_id,
@@ -338,18 +338,18 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             event_session = getattr(event, "session_id", None)
             if event_session != session_id:
                 continue
-            if isinstance(event, AdbTransportInventoryObservationStarted):
+            if isinstance(event, AdbDevicesObservationStarted):
                 return self._complete(
                     operation,
-                    AdbTransportInventoryObservationEstablishmentStatus.SATISFIED,
+                    AdbDevicesObservationEstablishmentStatus.SATISFIED,
                     initial_probe,
                     ensure_result=ensure_result,
                     observation_session_id=session_id,
                 )
-            if isinstance(event, AdbTransportInventoryObservationFailed):
+            if isinstance(event, AdbDevicesObservationFailed):
                 return self._complete(
                     operation,
-                    AdbTransportInventoryObservationEstablishmentStatus.FAILED,
+                    AdbDevicesObservationEstablishmentStatus.FAILED,
                     initial_probe,
                     ensure_result=ensure_result,
                     observation_session_id=session_id,
@@ -358,10 +358,10 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
                         event.diagnostic or f"observation failed: {event.failure.value}"
                     ),
                 )
-            if isinstance(event, AdbTransportInventoryObservationStopped):
+            if isinstance(event, AdbDevicesObservationStopped):
                 return self._complete(
                     operation,
-                    AdbTransportInventoryObservationEstablishmentStatus.FAILED,
+                    AdbDevicesObservationEstablishmentStatus.FAILED,
                     initial_probe,
                     ensure_result=ensure_result,
                     observation_session_id=session_id,
@@ -373,9 +373,9 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
         collect: Callable[[object], None],
     ) -> tuple[EventSubscriptionToken, ...]:
         return (
-            self._bus.subscribe(AdbTransportInventoryObservationStarted, collect),
-            self._bus.subscribe(AdbTransportInventoryObservationFailed, collect),
-            self._bus.subscribe(AdbTransportInventoryObservationStopped, collect),
+            self._bus.subscribe(AdbDevicesObservationStarted, collect),
+            self._bus.subscribe(AdbDevicesObservationFailed, collect),
+            self._bus.subscribe(AdbDevicesObservationStopped, collect),
         )
 
     def _next_event(
@@ -394,16 +394,16 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
 
     @staticmethod
     def _complete(
-        operation: AdbTransportInventoryObservationEstablishment,
-        status: AdbTransportInventoryObservationEstablishmentStatus,
+        operation: AdbDevicesObservationEstablishment,
+        status: AdbDevicesObservationEstablishmentStatus,
         initial_probe: AdbServerProbeResult,
         *,
         ensure_result: AdbServerEnsureResult | None = None,
         observation_session_id: AdbObservationSessionId | None = None,
-        observation_failure: AdbTransportInventoryObservationFailure | None = None,
+        observation_failure: AdbDevicesObservationFailure | None = None,
         diagnostic: str | None = None,
-    ) -> AdbTransportInventoryObservationEstablishmentResult:
-        return AdbTransportInventoryObservationEstablishmentResult(
+    ) -> AdbDevicesObservationEstablishmentResult:
+        return AdbDevicesObservationEstablishmentResult(
             operation=operation,
             status=status,
             initial_probe=initial_probe,
@@ -415,9 +415,9 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
 
 
 __all__ = [
-    "AdbTransportInventoryObservationEstablishment",
-    "AdbTransportInventoryObservationEstablishmentOrchestrator",
-    "AdbTransportInventoryObservationEstablishmentPolicy",
-    "AdbTransportInventoryObservationEstablishmentResult",
-    "AdbTransportInventoryObservationEstablishmentStatus",
+    "AdbDevicesObservationEstablishment",
+    "AdbDevicesObservationEstablishmentOrchestrator",
+    "AdbDevicesObservationEstablishmentPolicy",
+    "AdbDevicesObservationEstablishmentResult",
+    "AdbDevicesObservationEstablishmentStatus",
 ]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.transport.inventory.domain import AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices.domain import AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.selection import AdbTransportSelector
 
 

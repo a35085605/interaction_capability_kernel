@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 
 import adb
-from adb.transport.inventory import AdbDevicesSnapshot, AdbTrackedDevice
-from adb.transport.inventory.adapters import find_tracked_device
+from adb.transport.devices import AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices.adapters import find_tracked_device
 from adb.transport import (
     AdbDeviceSerial,
     AdbTransportById,

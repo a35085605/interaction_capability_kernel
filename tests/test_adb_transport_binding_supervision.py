@@ -11,9 +11,9 @@ from adb.supervision import (
     AdbTransportBindingSupervisor,
 )
 from adb.transport.binding import AdbTransportBindingConfiguration, AdbTransportBindingResolutionStatus
-from adb.transport.inventory.domain import AdbConnectionState, AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices.domain import AdbConnectionState, AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.signal import AdbTransportInventoryObservationStarted, AdbTransportInventorySnapshotObserved
+from adb.transport.observation.signal import AdbDevicesObservationStarted, AdbDevicesSnapshotObserved
 from adb.transport.orchestration import AdbTransportPreparationPolicy, AdbTransportPreparationResult, AdbTransportPreparationStatus
 from adb.transport.selection import AdbDeviceSerial
 from eventing.models import EventSubscriptionToken
@@ -174,7 +174,7 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
         self.assertEqual(len(preparation.calls), 1)
         self.assertEqual(exhausted[0].configuration.serial, _binding().serial)
         self.assertIs(exhausted[0].result.status, AdbTransportPreparationStatus.TIMED_OUT)
-        self.bus.publish(AdbTransportInventorySnapshotObserved(_endpoint(), self.session, absent))
+        self.bus.publish(AdbDevicesSnapshotObserved(_endpoint(), self.session, absent))
         time.sleep(0.02)
         self.assertEqual(len(preparation.calls), 1)
 
@@ -203,8 +203,8 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
         supervisor.start()
         supervisor.register(_binding(), AdbTransportBindingSupervisionPolicy(preparation_policy))
         _wait_until(lambda: len(preparation.calls) == 1)
-        self.bus.publish(AdbTransportInventorySnapshotObserved(_endpoint(), self.session, present))
-        self.bus.publish(AdbTransportInventorySnapshotObserved(_endpoint(), self.session, absent))
+        self.bus.publish(AdbDevicesSnapshotObserved(_endpoint(), self.session, present))
+        self.bus.publish(AdbDevicesSnapshotObserved(_endpoint(), self.session, absent))
         _wait_until(lambda: len(preparation.calls) == 2)
 
     def test_new_observation_generation_establishes_a_new_binding_baseline(self) -> None:
@@ -218,8 +218,8 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
         supervisor.register(_binding())
         next_session = AdbObservationSessionId(_endpoint(), 2)
         self.observation.current_session_id = next_session
-        self.bus.publish(AdbTransportInventoryObservationStarted(_endpoint(), next_session))
-        self.bus.publish(AdbTransportInventorySnapshotObserved(_endpoint(), next_session, _snapshot("target")))
+        self.bus.publish(AdbDevicesObservationStarted(_endpoint(), next_session))
+        self.bus.publish(AdbDevicesSnapshotObserved(_endpoint(), next_session, _snapshot("target")))
         self.assertEqual(len(changes), 2)
         self.assertIsNone(changes[1].previous)
         self.assertEqual(changes[1].session_id, next_session)

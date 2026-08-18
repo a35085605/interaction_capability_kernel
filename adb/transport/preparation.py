@@ -13,15 +13,15 @@ from adb.transport.binding import (
     resolve_transport_binding,
 )
 from adb.transport.connection import AdbTcpConnect, AdbTcpConnector
-from adb.transport.inventory.domain import AdbDevicesSnapshot, AdbTrackedDevice
-from adb.transport.inventory.query import AdbDevicesSnapshotReader
+from adb.transport.devices.domain import AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices.query import AdbDevicesSnapshotReader
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.runner import AdbTransportInventoryObservationController
+from adb.transport.observation.runner import AdbDevicesObservationController
 from adb.transport.observation.signal import (
-    AdbTransportInventoryObservationFailed,
-    AdbTransportInventoryObservationStarted,
-    AdbTransportInventoryObservationStopped,
-    AdbTransportInventorySnapshotObserved,
+    AdbDevicesObservationFailed,
+    AdbDevicesObservationStarted,
+    AdbDevicesObservationStopped,
+    AdbDevicesSnapshotObserved,
 )
 from adb.transport.orchestration import (
     AdbTransportPreparation,
@@ -57,7 +57,7 @@ class AdbTransportPreparationOrchestrator:
         snapshot_reader: AdbDevicesSnapshotReader,
         connector: AdbTcpConnector,
         event_bus: EventBus,
-        observation: AdbTransportInventoryObservationController,
+        observation: AdbDevicesObservationController,
         *,
         _monotonic: _MonotonicClock = monotonic,
     ) -> None:
@@ -75,7 +75,7 @@ class AdbTransportPreparationOrchestrator:
             getattr(event_bus, "subscribe", None)
         ) or not callable(getattr(event_bus, "unsubscribe", None)):
             raise TypeError("event_bus must satisfy EventBus")
-        if not isinstance(observation, AdbTransportInventoryObservationController):
+        if not isinstance(observation, AdbDevicesObservationController):
             raise TypeError("observation must satisfy observation controller")
         self.endpoint = endpoint
         self.binding_configuration = binding_configuration
@@ -130,10 +130,10 @@ class AdbTransportPreparationOrchestrator:
 
     def _subscribe(self, collect: Callable[[object], None]) -> tuple[EventSubscriptionToken, ...]:
         return (
-            self._bus.subscribe(AdbTransportInventorySnapshotObserved, collect),
-            self._bus.subscribe(AdbTransportInventoryObservationFailed, collect),
-            self._bus.subscribe(AdbTransportInventoryObservationStopped, collect),
-            self._bus.subscribe(AdbTransportInventoryObservationStarted, collect),
+            self._bus.subscribe(AdbDevicesSnapshotObserved, collect),
+            self._bus.subscribe(AdbDevicesObservationFailed, collect),
+            self._bus.subscribe(AdbDevicesObservationStopped, collect),
+            self._bus.subscribe(AdbDevicesObservationStarted, collect),
         )
 
     def _run_episode(
@@ -230,7 +230,7 @@ class AdbTransportPreparationOrchestrator:
                         "transport inventory observation generation changed",
                     )
 
-            if isinstance(event, AdbTransportInventoryObservationFailed):
+            if isinstance(event, AdbDevicesObservationFailed):
                 return self._complete(
                     operation,
                     policy,
@@ -242,7 +242,7 @@ class AdbTransportPreparationOrchestrator:
                     final_row,
                     event.diagnostic or f"observation failed: {event.failure.value}",
                 )
-            if isinstance(event, AdbTransportInventoryObservationStopped):
+            if isinstance(event, AdbDevicesObservationStopped):
                 return self._complete(
                     operation,
                     policy,
@@ -254,9 +254,9 @@ class AdbTransportPreparationOrchestrator:
                     final_row,
                     "transport inventory observation stopped",
                 )
-            if isinstance(event, AdbTransportInventoryObservationStarted):
+            if isinstance(event, AdbDevicesObservationStarted):
                 continue
-            if not isinstance(event, AdbTransportInventorySnapshotObserved):
+            if not isinstance(event, AdbDevicesSnapshotObserved):
                 continue
 
             final_snapshot = event.snapshot

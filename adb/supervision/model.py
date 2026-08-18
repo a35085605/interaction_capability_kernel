@@ -43,7 +43,7 @@ class AdbTransportBindingSupervisionPolicy:
 
 
 @dataclass(frozen=True, slots=True, order=True)
-class AdbTransportInventoryObservationEstablishmentCycleId:
+class AdbDevicesObservationEstablishmentCycleId:
     """Opaque identity for one supervision cycle spanning establishment attempts."""
 
     value: str
@@ -59,12 +59,12 @@ class AdbTransportInventoryObservationEstablishmentCycleId:
         )
 
     @classmethod
-    def new(cls) -> "AdbTransportInventoryObservationEstablishmentCycleId":
+    def new(cls) -> "AdbDevicesObservationEstablishmentCycleId":
         return cls(uuid4().hex)
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationSupervisionPolicy:
+class AdbDevicesObservationSupervisionPolicy:
     """Retry policy around bounded transport-inventory observation establishment episodes."""
 
     ensure_policy: AdbServerEnsurePolicy
@@ -129,6 +129,6 @@ class AdbTransportInventoryObservationSupervisionPolicy:
 
 __all__ = [
     "AdbTransportBindingSupervisionPolicy",
-    "AdbTransportInventoryObservationEstablishmentCycleId",
-    "AdbTransportInventoryObservationSupervisionPolicy",
+    "AdbDevicesObservationEstablishmentCycleId",
+    "AdbDevicesObservationSupervisionPolicy",
 ]

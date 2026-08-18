@@ -7,7 +7,7 @@ import socket
 from threading import Lock
 from time import monotonic
 
-from adb.transport.inventory.domain import AdbDevicesSnapshot
+from adb.transport.devices.domain import AdbDevicesSnapshot
 from adb._internal.framing import encode_service, parse_hex_length
 from adb._internal.proto import parse_devices_snapshot
 from adb.errors import AdbProtocolError

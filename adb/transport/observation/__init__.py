@@ -9,15 +9,15 @@ from adb.transport.observation.contracts import (
     AdbObservationSessionId,
 )
 from adb.transport.observation.establishment import (
-    AdbTransportInventoryObservationEstablishment,
-    AdbTransportInventoryObservationEstablishmentOrchestrator,
-    AdbTransportInventoryObservationEstablishmentPolicy,
-    AdbTransportInventoryObservationEstablishmentResult,
-    AdbTransportInventoryObservationEstablishmentStatus,
+    AdbDevicesObservationEstablishment,
+    AdbDevicesObservationEstablishmentOrchestrator,
+    AdbDevicesObservationEstablishmentPolicy,
+    AdbDevicesObservationEstablishmentResult,
+    AdbDevicesObservationEstablishmentStatus,
 )
 from adb.transport.observation.runner import (
-    AdbTransportInventoryObservationController,
-    AdbTransportInventoryObservationRunner,
+    AdbDevicesObservationController,
+    AdbDevicesObservationRunner,
 )
 
 __all__ = [
@@ -27,11 +27,11 @@ __all__ = [
     "AdbObservationServerConnectionError",
     "AdbObservationServiceError",
     "AdbObservationSessionId",
-    "AdbTransportInventoryObservationController",
-    "AdbTransportInventoryObservationEstablishment",
-    "AdbTransportInventoryObservationEstablishmentOrchestrator",
-    "AdbTransportInventoryObservationEstablishmentPolicy",
-    "AdbTransportInventoryObservationEstablishmentResult",
-    "AdbTransportInventoryObservationEstablishmentStatus",
-    "AdbTransportInventoryObservationRunner",
+    "AdbDevicesObservationController",
+    "AdbDevicesObservationEstablishment",
+    "AdbDevicesObservationEstablishmentOrchestrator",
+    "AdbDevicesObservationEstablishmentPolicy",
+    "AdbDevicesObservationEstablishmentResult",
+    "AdbDevicesObservationEstablishmentStatus",
+    "AdbDevicesObservationRunner",
 ]

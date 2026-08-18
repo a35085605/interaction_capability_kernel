@@ -12,11 +12,11 @@ from adb.transport.observation.contracts import (
     AdbObservationSessionId,
 )
 from adb.transport.observation.signal import (
-    AdbTransportInventorySnapshotObserved,
-    AdbTransportInventoryObservationFailed,
-    AdbTransportInventoryObservationFailure,
-    AdbTransportInventoryObservationStarted,
-    AdbTransportInventoryObservationStopped,
+    AdbDevicesSnapshotObserved,
+    AdbDevicesObservationFailed,
+    AdbDevicesObservationFailure,
+    AdbDevicesObservationStarted,
+    AdbDevicesObservationStopped,
 )
 from adb.transport.observation.source import AdbTrackDevicesSession, AdbTrackDevicesSource
 from eventing import EventPublisher
@@ -37,7 +37,7 @@ def _default_thread_factory(*args, **kwargs) -> Thread:
 
 
 @runtime_checkable
-class AdbTransportInventoryObservationController(Protocol):
+class AdbDevicesObservationController(Protocol):
     @property
     def current_session_id(self) -> AdbObservationSessionId | None: ...
 
@@ -48,7 +48,7 @@ class AdbTransportInventoryObservationController(Protocol):
     def close(self) -> None: ...
 
 
-class AdbTransportInventoryObservationRunner:
+class AdbDevicesObservationRunner:
     """Produce lifecycle signals for generation-fenced transport-inventory sessions."""
 
     def __init__(
@@ -138,35 +138,35 @@ class AdbTransportInventoryObservationRunner:
         try:
             session = source.open()
             if session is None:
-                terminal = AdbTransportInventoryObservationStopped(endpoint, session_id)
+                terminal = AdbDevicesObservationStopped(endpoint, session_id)
             else:
                 self._publisher.publish(
-                    AdbTransportInventoryObservationStarted(endpoint, session_id)
+                    AdbDevicesObservationStarted(endpoint, session_id)
                 )
                 for snapshot in session.snapshots():
                     self._publisher.publish(
-                        AdbTransportInventorySnapshotObserved(endpoint, session_id, snapshot)
+                        AdbDevicesSnapshotObserved(endpoint, session_id, snapshot)
                     )
-                terminal = AdbTransportInventoryObservationStopped(endpoint, session_id)
+                terminal = AdbDevicesObservationStopped(endpoint, session_id)
         except AdbObservationServerConnectionError as exc:
-            terminal = AdbTransportInventoryObservationFailed(
+            terminal = AdbDevicesObservationFailed(
                 endpoint,
                 session_id,
-                AdbTransportInventoryObservationFailure.SERVER_CONNECTION,
+                AdbDevicesObservationFailure.SERVER_CONNECTION,
                 str(exc),
             )
         except AdbObservationServiceError as exc:
-            terminal = AdbTransportInventoryObservationFailed(
+            terminal = AdbDevicesObservationFailed(
                 endpoint,
                 session_id,
-                AdbTransportInventoryObservationFailure.SERVICE,
+                AdbDevicesObservationFailure.SERVICE,
                 str(exc),
             )
         except AdbObservationProtocolError as exc:
-            terminal = AdbTransportInventoryObservationFailed(
+            terminal = AdbDevicesObservationFailed(
                 endpoint,
                 session_id,
-                AdbTransportInventoryObservationFailure.PROTOCOL,
+                AdbDevicesObservationFailure.PROTOCOL,
                 str(exc),
             )
         finally:
@@ -191,6 +191,6 @@ class AdbTransportInventoryObservationRunner:
 
 
 __all__ = [
-    "AdbTransportInventoryObservationController",
-    "AdbTransportInventoryObservationRunner",
+    "AdbDevicesObservationController",
+    "AdbDevicesObservationRunner",
 ]

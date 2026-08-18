@@ -14,12 +14,12 @@ from adb.server.provisioning import (
 )
 from adb.server.status import AdbServerStatus, AdbServerStatusReader
 from adb.supervision import (
-    AdbTransportInventoryObservationSupervisionPolicy,
-    AdbTransportInventoryObservationSupervisor,
+    AdbDevicesObservationSupervisionPolicy,
+    AdbDevicesObservationSupervisor,
 )
 from adb.transport.connection import AdbTcpConnect
 from adb.transport.connection.adapters import SubprocessAdbTransport
-from adb.transport.observation import AdbTransportInventoryObservationEstablishmentPolicy
+from adb.transport.observation import AdbDevicesObservationEstablishmentPolicy
 
 
 class AdbSemanticNamespaceTests(unittest.TestCase):
@@ -46,18 +46,18 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
         self.assertEqual(SubprocessAdbTransport.__module__, "adb.transport.connection.adapters")
         self.assertEqual(AdbTcpConnect("192.0.2.1:5555").address, "192.0.2.1:5555")
 
-    def test_transport_inventory_observation_namespaces_are_canonical(self) -> None:
+    def test_devices_observation_namespaces_are_canonical(self) -> None:
         self.assertEqual(
-            AdbTransportInventoryObservationEstablishmentPolicy.__module__,
+            AdbDevicesObservationEstablishmentPolicy.__module__,
             "adb.transport.observation.establishment",
         )
         self.assertEqual(
-            AdbTransportInventoryObservationSupervisionPolicy.__module__,
+            AdbDevicesObservationSupervisionPolicy.__module__,
             "adb.supervision.model",
         )
         self.assertEqual(
-            AdbTransportInventoryObservationSupervisor.__module__,
-            "adb.supervision.transport_inventory_observation",
+            AdbDevicesObservationSupervisor.__module__,
+            "adb.supervision.devices_observation",
         )
 
     def test_legacy_adb_compatibility_exports_are_removed(self) -> None:
@@ -69,7 +69,9 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
             "adb.server.query",
             "adb.supervision.recovery",
             "adb.supervision.transport_observation",
+            "adb.supervision.transport_inventory_observation",
             "adb.transport.command",
+            "adb.transport.inventory",
             "adb.transport.observation.recovery",
         ):
             with self.subTest(namespace=namespace):
@@ -81,6 +83,7 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
             "AdbServerRecoveryRetryDue",
             "AdbServerRecoverySupervisor",
             "AdbTransportObservationSupervisor",
+            "AdbTransportInventoryObservationSupervisor",
         ):
             with self.subTest(name=name):
                 self.assertFalse(hasattr(supervision, name))

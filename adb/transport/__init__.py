@@ -25,7 +25,7 @@ from adb.transport.orchestration import (
     AdbTransportRecovery,
 )
 from adb.transport.preparation import AdbTransportPreparationOrchestrator
-from adb.transport.inventory import (
+from adb.transport.devices import (
     AdbConnectionState,
     AdbConnectionType,
     AdbDevicesSnapshot,
@@ -40,8 +40,8 @@ from adb.transport.observation import (
     AdbObservationServerConnectionError,
     AdbObservationServiceError,
     AdbObservationSessionId,
-    AdbTransportInventoryObservationController,
-    AdbTransportInventoryObservationRunner,
+    AdbDevicesObservationController,
+    AdbDevicesObservationRunner,
 )
 
 __all__ = [
@@ -69,8 +69,8 @@ __all__ = [
     "AdbTransportPreparationStatus",
     "AdbTransportPresenceSatisfaction",
     "AdbTransportRecovery",
-    "AdbTransportInventoryObservationController",
-    "AdbTransportInventoryObservationRunner",
+    "AdbDevicesObservationController",
+    "AdbDevicesObservationRunner",
     "AdbTransportById",
     "AdbTransportBySerial",
     "AdbTransportFeatures",
