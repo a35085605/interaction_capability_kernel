@@ -135,7 +135,12 @@ class AdbTransportBindingResolutionTests(unittest.TestCase):
         absent = resolve_transport_binding(configuration, AdbDevicesSnapshot())
         ambiguous = resolve_transport_binding(
             configuration,
-            AdbDevicesSnapshot((_row(AdbConnectionState.OFFLINE, 27), _row(AdbConnectionState.DEVICE, 31))),
+            AdbDevicesSnapshot(
+                (
+                    _row(AdbConnectionState.OFFLINE, 27),
+                    _row(AdbConnectionState.DEVICE, 31),
+                )
+            ),
         )
 
         self.assertIs(absent.status, AdbTransportBindingResolutionStatus.ABSENT)
@@ -207,7 +212,7 @@ class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
         )
         self.assertEqual(result.attempts, ())
         self.assertEqual(connector.operations, [])
-        self.assertEqual(result.pinned_transport_id, AdbTransportId(27))
+        self.assertEqual(result.final_row.transport_id, AdbTransportId(27))
         self.assertIs(completed[-1].result, result)
 
     def test_presence_and_state_are_two_gates_inside_one_episode(self) -> None:
@@ -289,30 +294,34 @@ class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
         self.assertIs(result.final_row.state, AdbConnectionState.UNAUTHORIZED)
         self.assertEqual(connector.operations, [])
 
-    def test_pinned_native_identity_replacement_is_not_silent(self) -> None:
+    def test_serial_selected_preparation_follows_fresh_resolution(self) -> None:
         connector = _Connector(_attempt())
         orchestrator = self._orchestrator(
             AdbDevicesSnapshot((_row(AdbConnectionState.OFFLINE, 27),)),
             connector,
         )
-
-        def replace() -> None:
-            self._publish(AdbDevicesSnapshot((_row(AdbConnectionState.DEVICE, 31),)))
-
-        self.bus.subscribe(AdbTransportInventoryObservationStarted, lambda event: None)
         original_read = orchestrator._snapshot_reader.read
 
         def read_and_replace(endpoint):
             snapshot = original_read(endpoint)
-            replace()
+            self._publish(AdbDevicesSnapshot())
+            self._publish(AdbDevicesSnapshot((_row(AdbConnectionState.DEVICE, 31),)))
             return snapshot
 
         orchestrator._snapshot_reader.read = read_and_replace  # type: ignore[method-assign]
         result = orchestrator.prepare(self.operation, self.policy)
 
-        self.assertIs(result.status, AdbTransportPreparationStatus.TRANSPORT_REPLACED)
-        self.assertEqual(result.pinned_transport_id, AdbTransportId(27))
+        self.assertIs(result.status, AdbTransportPreparationStatus.SATISFIED)
+        self.assertIs(
+            result.satisfaction,
+            AdbTransportPreparationSatisfaction.ACHIEVED,
+        )
+        self.assertIs(
+            result.presence_satisfaction,
+            AdbTransportPresenceSatisfaction.ALREADY_PRESENT,
+        )
         self.assertEqual(result.final_row.transport_id, AdbTransportId(31))
+        self.assertEqual(connector.operations, [])
 
     def test_newer_observation_generation_terminates_episode(self) -> None:
         connector = _Connector(_attempt())
