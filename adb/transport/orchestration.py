@@ -5,14 +5,14 @@ from enum import Enum
 import math
 from numbers import Integral, Real
 
-from adb.configuration import AdbServerId, AdbTransportBindingId
+from adb.configuration import AdbServerId
 from adb.transport.inventory.domain import (
     AdbConnectionState,
     AdbDevicesSnapshot,
     AdbTrackedDevice,
 )
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.selection import AdbTransportId
+from adb.transport.selection import AdbDeviceSerial, AdbTransportId
 from native_attempt import NativeAttemptResult
 
 
@@ -65,30 +65,30 @@ def _normalize_optional_text(value: object, *, field_name: str) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportPreparation:
-    """Request one bounded preparation episode for a configured transport binding."""
+    """Request one bounded preparation episode for a configured serial-selected transport."""
 
     server_id: AdbServerId
-    binding_id: AdbTransportBindingId
+    serial: AdbDeviceSerial
 
     def __post_init__(self) -> None:
         if not isinstance(self.server_id, AdbServerId):
             raise TypeError("server_id must be AdbServerId")
-        if not isinstance(self.binding_id, AdbTransportBindingId):
-            raise TypeError("binding_id must be AdbTransportBindingId")
+        if not isinstance(self.serial, AdbDeviceSerial):
+            raise TypeError("serial must be AdbDeviceSerial")
 
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportRecovery:
-    """Request domain-local orchestration to recover one configured transport binding."""
+    """Request domain-local orchestration to recover one configured serial-selected transport."""
 
     server_id: AdbServerId
-    binding_id: AdbTransportBindingId
+    serial: AdbDeviceSerial
 
     def __post_init__(self) -> None:
         if not isinstance(self.server_id, AdbServerId):
             raise TypeError("server_id must be AdbServerId")
-        if not isinstance(self.binding_id, AdbTransportBindingId):
-            raise TypeError("binding_id must be AdbTransportBindingId")
+        if not isinstance(self.serial, AdbDeviceSerial):
+            raise TypeError("serial must be AdbDeviceSerial")
 
 
 @dataclass(frozen=True, slots=True)
