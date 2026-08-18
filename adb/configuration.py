@@ -45,28 +45,7 @@ class AdbServerConfiguration:
             raise TypeError("endpoint must be AdbServerEndpoint")
 
 
-@dataclass(frozen=True, slots=True, order=True)
-class AdbTransportBindingId:
-    """Caller-owned identity for one configured ADB transport binding."""
-
-    value: str
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "value",
-            _normalize_required_text(
-                self.value,
-                field_name="ADB transport binding id",
-            ),
-        )
-
-    def __str__(self) -> str:
-        return self.value
-
-
 __all__ = [
     "AdbServerConfiguration",
     "AdbServerId",
-    "AdbTransportBindingId",
 ]
