@@ -33,7 +33,7 @@ class AdbServerId:
 
 @dataclass(frozen=True, slots=True)
 class AdbServerConfiguration:
-    """Caller-owned binding from one ADB server identity to its smart-socket endpoint."""
+    """Immutable binding from one caller-owned ADB server id to one smart-socket endpoint."""
 
     server_id: AdbServerId
     endpoint: AdbServerEndpoint
