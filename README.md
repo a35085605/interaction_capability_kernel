@@ -171,16 +171,18 @@ establish stable native identity.
 
 `AdbServerEndpoint` identifies the smart-socket endpoint queried by host-side ADB clients.
 `AdbServerConfiguration` binds that endpoint to a caller-owned `AdbServerId` for ADB-domain
-composition. `AdbDeviceSerial` is a native selection key and `AdbTransportId` is a native
-server-local runtime identity; both can be used by typed transport selectors. Caller-owned
-`AdbServerId` and `AdbTransportBindingId` live under `adb.configuration`; they are not native
-ADB state. `AdbTransportFeatures` is a selected-transport fact with an open native feature
-vocabulary. Android runtime facts are not folded into `AdbTrackedDevice`.
+composition. `AdbDeviceSerial` is the persistent native selection key for configured ADB
+transports. `AdbTransportId` is a server-local runtime identity derived from fresh inventory
+evidence; it is not a durable configuration key. Caller-owned `AdbServerId` lives under
+`adb.configuration`; serials and runtime transport IDs remain native ADB vocabulary.
+`AdbTransportFeatures` is a selected-transport fact with an open native feature vocabulary.
+Android runtime facts are not folded into `AdbTrackedDevice`.
 
-`AdbTransportBindingConfiguration` binds a caller-owned transport binding identity to an
-explicit inventory selector and an optional TCP connect address. The selector is deliberately
-separate from the connect address; preparation does not assume that the string passed to
-`adb connect` must later be the tracker serial.
+`AdbTransportBindingConfiguration` associates one configured server with an `AdbDeviceSerial`
+and an optional TCP connect address. The serial is deliberately independent from the connect
+address; preparation does not assume that the string passed to `adb connect` must later be the
+tracker serial. Runtime `transport_id` values are derived from fresh inventory and may be pinned
+inside a bounded episode to detect transport replacement.
 
 Concrete ADB-backed adapters share a private smart-socket service client. The client is not
 a public raw-shell capability: public queries, capture backends, platform commands, and
