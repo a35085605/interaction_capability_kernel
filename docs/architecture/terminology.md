@@ -43,11 +43,13 @@ platform-neutral input/touch interaction commands. They are peer capabilities.
 protocol vocabulary: `AdbServerStatus`, `AdbDevicesSnapshot`, `AdbTrackedDevice`,
 `AdbConnectionState`, and `AdbConnectionType`. The current native transport identity is
 `AdbTrackedDevice.transport_id`; `AdbTransportFeatures` is the open advertised feature set
-for one selected transport. `AdbServerId` and `AdbTransportBindingId` are caller-owned
-configuration identities and are intentionally separate from native ADB facts.
-`AdbServerConfiguration` binds one `AdbServerId` to the smart-socket `AdbServerEndpoint`
-used for host queries, commands, and ADB-domain orchestration. Android owns `AndroidUserId`,
-`AndroidPackageName`, `AndroidComponentName`, logical `AndroidDisplayId`, and physical capture
+for one selected transport. `AdbServerId` is a caller-owned configuration identity and is
+intentionally separate from native ADB facts. `AdbDeviceSerial` is the persistent native key
+used to identify configured transports across inventory observations; `AdbTransportId` remains
+a server-local runtime identity derived from those observations. `AdbServerConfiguration` binds
+one `AdbServerId` to the smart-socket `AdbServerEndpoint` used for host queries, commands, and
+ADB-domain orchestration. Android owns `AndroidUserId`, `AndroidPackageName`,
+`AndroidComponentName`, logical `AndroidDisplayId`, and physical capture
 `AndroidPhysicalDisplayId`. Logical and physical display IDs are never implicitly
 interchangeable.
 
