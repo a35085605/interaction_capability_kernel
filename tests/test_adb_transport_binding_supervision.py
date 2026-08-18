@@ -3,11 +3,7 @@ from __future__ import annotations
 import time
 import unittest
 
-from adb.configuration import (
-    AdbServerConfiguration,
-    AdbServerId,
-    AdbTransportBindingId,
-)
+from adb.configuration import AdbServerConfiguration, AdbServerId
 from adb.server.endpoint import AdbServerEndpoint
 from adb.supervision import (
     AdbTransportBindingRecoveryExhausted,
@@ -34,7 +30,7 @@ from adb.transport.orchestration import (
     AdbTransportPreparationResult,
     AdbTransportPreparationStatus,
 )
-from adb.transport.selection import AdbDeviceSerial, AdbTransportBySerial
+from adb.transport.selection import AdbDeviceSerial
 from eventing.models import EventSubscriptionToken
 
 
@@ -108,8 +104,7 @@ def _server() -> AdbServerConfiguration:
 def _binding(serial: str = "target") -> AdbTransportBindingConfiguration:
     return AdbTransportBindingConfiguration(
         _server().server_id,
-        AdbTransportBindingId("primary"),
-        AdbTransportBySerial(AdbDeviceSerial(serial)),
+        AdbDeviceSerial(serial),
         "192.0.2.10:5555",
     )
 
@@ -129,7 +124,7 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
         self.session = AdbObservationSessionId(_server().server_id, 1)
         self.observation = _Observation(self.session)
 
-    def test_registered_binding_projects_only_its_selector_from_full_inventory(self) -> None:
+    def test_registered_binding_projects_only_its_serial_from_full_inventory(self) -> None:
         reader = _SnapshotReader(_snapshot("other-a", "target", "other-b"))
         supervisor = AdbTransportBindingSupervisor(
             _server(), self.bus, self.observation, reader, lambda config: None
@@ -140,13 +135,30 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
 
         supervisor.register(_binding())
 
-        resolution = supervisor.resolution(_binding().binding_id)
+        resolution = supervisor.resolution(_binding().serial)
         self.assertIsNotNone(resolution)
         self.assertIs(resolution.status, AdbTransportBindingResolutionStatus.RESOLVED)
         self.assertEqual(resolution.row.serial, "target")
         self.assertEqual(len(changes), 1)
         self.assertIsNone(changes[0].previous)
         self.assertEqual(changes[0].current.matches, (resolution.row,))
+
+    def test_serial_is_the_registration_identity(self) -> None:
+        reader = _SnapshotReader(_snapshot("target"))
+        supervisor = AdbTransportBindingSupervisor(
+            _server(), self.bus, self.observation, reader, lambda config: None
+        )
+        supervisor.start()
+        supervisor.register(_binding())
+
+        with self.assertRaisesRegex(ValueError, "already registered"):
+            supervisor.register(
+                AdbTransportBindingConfiguration(
+                    _server().server_id,
+                    AdbDeviceSerial("target"),
+                    "192.0.2.99:5555",
+                )
+            )
 
     def test_absent_binding_runs_one_bounded_recovery_and_emits_exhausted(self) -> None:
         absent = _snapshot("other-a", "other-b")
@@ -187,7 +199,7 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
         _wait_until(lambda: len(exhausted) == 1)
 
         self.assertEqual(len(preparation.calls), 1)
-        self.assertEqual(exhausted[0].configuration.binding_id, _binding().binding_id)
+        self.assertEqual(exhausted[0].configuration.serial, _binding().serial)
         self.assertIs(exhausted[0].result.status, AdbTransportPreparationStatus.TIMED_OUT)
 
         self.bus.publish(

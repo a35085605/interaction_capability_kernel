@@ -110,17 +110,17 @@ ADB-domain fact/query
 `AdbServerEnsureAvailable` and `AdbServerEnsureUnavailable`, including the bounded
 `AdbServerEnsureOrchestrator`. Long-lived transport-observation lifecycle supervision lives
 under `adb.supervision` rather than under the server noun slice. `adb.transport.orchestration`
-owns transport preparation/recovery requests keyed by caller-owned ADB configuration
-identities. When orchestration performs multiple native attempts, its result preserves those
-attempts individually rather than collapsing them into one `NativeAttemptResult`.
+owns transport preparation/recovery requests keyed by the configured `AdbServerId` and
+`AdbDeviceSerial`. When orchestration performs multiple native attempts, its result preserves
+those attempts individually rather than collapsing them into one `NativeAttemptResult`.
 
 Transport preparation keeps **responsibilities separate while keeping one episode**:
 
 ```text
-configured transport binding
+configured server + serial
           │
           ▼
-  binding resolution
+ serial resolution
  ABSENT / RESOLVED / AMBIGUOUS
           │
           ▼
@@ -138,12 +138,13 @@ AdbTransportPreparationResult
 The episode uses one authoritative deadline and one active transport-inventory observation
 generation. It subscribes before its fresh initial inventory read so updates that occur during
 the probe or atomic connect attempt are not lost between separate orchestration phases. A
-non-zero `AdbTrackedDevice.transport_id` pins native identity for the episode. If that identity
-disappears or the configured selector resolves to another native transport, preparation
-reports loss or replacement rather than inferring continuity.
+non-zero `AdbTrackedDevice.transport_id` is derived from fresh inventory and pins native
+identity for the episode. If that runtime identity disappears or the configured serial resolves
+to another native transport, preparation reports loss or replacement rather than inferring
+continuity.
 
 Presence is evidence-driven. A failed atomic `AdbTcpConnect` attempt does not by itself make
-the presence gate fail if fresh inventory evidence later resolves the configured binding. The
+the presence gate fail if fresh inventory evidence later resolves the configured serial. The
 attempt remains in the preparation result, while satisfaction is determined from the observed
 condition. Readiness is separately policy-driven; `DEVICE` is not a universal transport
 success state, and unknown future AOSP state values remain non-satisfying unless a policy

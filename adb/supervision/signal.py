@@ -36,10 +36,10 @@ class AdbTransportBindingResolutionChanged:
         if self.current.configuration.server_id != self.session_id.server_id:
             raise ValueError("binding resolution server_id must match observation session")
         if self.previous is not None and (
-            self.previous.configuration.binding_id
-            != self.current.configuration.binding_id
+            self.previous.configuration.serial
+            != self.current.configuration.serial
         ):
-            raise ValueError("binding resolution change must keep one binding identity")
+            raise ValueError("binding resolution change must keep one serial")
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +56,8 @@ class AdbTransportBindingRecoveryExhausted:
             raise TypeError("result must be AdbTransportPreparationResult")
         if self.result.operation.server_id != self.configuration.server_id:
             raise ValueError("recovery result server_id must match binding configuration")
-        if self.result.operation.binding_id != self.configuration.binding_id:
-            raise ValueError("recovery result binding_id must match binding configuration")
+        if self.result.operation.serial != self.configuration.serial:
+            raise ValueError("recovery result serial must match binding configuration")
         if self.result.status is AdbTransportPreparationStatus.SATISFIED:
             raise ValueError("recovery exhausted signal requires an unsatisfied result")
 

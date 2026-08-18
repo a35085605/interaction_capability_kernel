@@ -5,11 +5,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from adb.configuration import (
-    AdbServerConfiguration,
-    AdbServerId,
-    AdbTransportBindingId,
-)
+from adb.configuration import AdbServerConfiguration, AdbServerId
 from adb.pairing.adapters import SubprocessAdbPairing
 from adb.pairing.command import AdbWirelessPair
 from adb.server.lifecycle import (
@@ -336,23 +332,23 @@ class SubprocessAdbServerTests(unittest.TestCase):
 
 
 class AdbTransportOrchestrationVocabularyTests(unittest.TestCase):
-    def test_transport_orchestration_uses_adb_domain_identity(self) -> None:
+    def test_transport_orchestration_uses_server_and_serial_identity(self) -> None:
         server_id = AdbServerId("localhost:5037")
-        binding_id = AdbTransportBindingId("device-1")
+        serial = AdbDeviceSerial("device-1")
 
         preparation = AdbTransportPreparation(
             server_id=server_id,
-            binding_id=binding_id,
+            serial=serial,
         )
         recovery = AdbTransportRecovery(
             server_id=server_id,
-            binding_id=binding_id,
+            serial=serial,
         )
 
         self.assertIs(preparation.server_id, server_id)
-        self.assertIs(preparation.binding_id, binding_id)
+        self.assertIs(preparation.serial, serial)
         self.assertIs(recovery.server_id, server_id)
-        self.assertIs(recovery.binding_id, binding_id)
+        self.assertIs(recovery.serial, serial)
 
 
 class SubprocessAdbTransportTests(unittest.TestCase):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from threading import Lock, Thread, current_thread
 from typing import Protocol, runtime_checkable
 
-from adb.configuration import AdbServerConfiguration, AdbTransportBindingId
+from adb.configuration import AdbServerConfiguration
 from adb.errors import AdbError
 from adb.supervision.model import AdbTransportBindingSupervisionPolicy
 from adb.supervision.signal import (
@@ -26,6 +26,7 @@ from adb.transport.observation.signal import (
     AdbTransportInventoryObservationStarted,
     AdbTransportInventorySnapshotObserved,
 )
+from adb.transport.selection import AdbDeviceSerial
 from adb.transport.orchestration import (
     AdbTransportPreparation,
     AdbTransportPreparationResult,
@@ -101,7 +102,7 @@ class AdbTransportBindingSupervisor:
         self._preparation_factory = preparation_factory
         self._thread_factory = _thread_factory
         self._lock = Lock()
-        self._registrations: dict[AdbTransportBindingId, _BindingRegistration] = {}
+        self._registrations: dict[AdbDeviceSerial, _BindingRegistration] = {}
         self._subscriptions: tuple[EventSubscriptionToken, ...] = ()
         self._closed = False
 
@@ -140,30 +141,30 @@ class AdbTransportBindingSupervisor:
                 raise RuntimeError("transport binding supervisor is closed")
             if not self._subscriptions:
                 raise RuntimeError("transport binding supervisor must be started before register")
-            if configuration.binding_id in self._registrations:
+            if configuration.serial in self._registrations:
                 raise ValueError("ADB transport binding is already registered")
-            self._registrations[configuration.binding_id] = _BindingRegistration(
+            self._registrations[configuration.serial] = _BindingRegistration(
                 configuration,
                 policy,
             )
 
-        self._project_fresh_snapshot(configuration.binding_id)
+        self._project_fresh_snapshot(configuration.serial)
 
-    def unregister(self, binding_id: AdbTransportBindingId) -> bool:
-        if not isinstance(binding_id, AdbTransportBindingId):
-            raise TypeError("binding_id must be AdbTransportBindingId")
+    def unregister(self, serial: AdbDeviceSerial) -> bool:
+        if not isinstance(serial, AdbDeviceSerial):
+            raise TypeError("serial must be AdbDeviceSerial")
         with self._lock:
-            registration = self._registrations.pop(binding_id, None)
+            registration = self._registrations.pop(serial, None)
         return registration is not None
 
     def resolution(
         self,
-        binding_id: AdbTransportBindingId,
+        serial: AdbDeviceSerial,
     ) -> AdbTransportBindingResolution | None:
-        if not isinstance(binding_id, AdbTransportBindingId):
-            raise TypeError("binding_id must be AdbTransportBindingId")
+        if not isinstance(serial, AdbDeviceSerial):
+            raise TypeError("serial must be AdbDeviceSerial")
         with self._lock:
-            registration = self._registrations.get(binding_id)
+            registration = self._registrations.get(serial)
             return None if registration is None else registration.resolution
 
     def close(self) -> None:
@@ -185,7 +186,7 @@ class AdbTransportBindingSupervisor:
             if thread is not current_thread():
                 thread.join()
 
-    def _project_fresh_snapshot(self, binding_id: AdbTransportBindingId) -> None:
+    def _project_fresh_snapshot(self, serial: AdbDeviceSerial) -> None:
         session_id = self._observation.current_session_id
         if session_id is None or session_id.server_id != self.configuration.server_id:
             return
@@ -195,7 +196,7 @@ class AdbTransportBindingSupervisor:
             return
         if self._observation.current_session_id != session_id:
             return
-        self._apply_snapshot(session_id, snapshot, binding_id=binding_id)
+        self._apply_snapshot(session_id, snapshot, serial=serial)
 
     def _on_observation_started(self, event: AdbTransportInventoryObservationStarted) -> None:
         if event.session_id.server_id != self.configuration.server_id:
@@ -218,18 +219,18 @@ class AdbTransportBindingSupervisor:
         session_id: AdbObservationSessionId,
         snapshot: AdbDevicesSnapshot,
         *,
-        binding_id: AdbTransportBindingId | None = None,
+        serial: AdbDeviceSerial | None = None,
     ) -> None:
         publications: list[object] = []
-        recoveries: list[AdbTransportBindingId] = []
+        recoveries: list[AdbDeviceSerial] = []
         with self._lock:
             if self._closed:
                 return
             registrations = (
-                [self._registrations[binding_id]]
-                if binding_id in self._registrations
+                [self._registrations[serial]]
+                if serial in self._registrations
                 else []
-                if binding_id is not None
+                if serial is not None
                 else list(self._registrations.values())
             )
             for registration in registrations:
@@ -260,21 +261,21 @@ class AdbTransportBindingSupervisor:
                 )
                 if should_recover:
                     registration.recovery_attempted_for_absence = True
-                    recoveries.append(registration.configuration.binding_id)
+                    recoveries.append(registration.configuration.serial)
 
         for publication in publications:
             self._bus.publish(publication)
-        for recovery_binding_id in recoveries:
-            self._launch_recovery(recovery_binding_id)
+        for recovery_serial in recoveries:
+            self._launch_recovery(recovery_serial)
 
-    def _launch_recovery(self, binding_id: AdbTransportBindingId) -> None:
+    def _launch_recovery(self, serial: AdbDeviceSerial) -> None:
         thread = self._thread_factory(
             target=self._run_recovery,
-            args=(binding_id,),
-            name=f"adb-binding-recovery-{binding_id.value}",
+            args=(serial,),
+            name=f"adb-transport-recovery-{serial.value}",
         )
         with self._lock:
-            registration = self._registrations.get(binding_id)
+            registration = self._registrations.get(serial)
             if registration is None or self._closed:
                 return
             if registration.recovery_thread is not None:
@@ -282,10 +283,10 @@ class AdbTransportBindingSupervisor:
             registration.recovery_thread = thread
         thread.start()
 
-    def _run_recovery(self, binding_id: AdbTransportBindingId) -> None:
+    def _run_recovery(self, serial: AdbDeviceSerial) -> None:
         try:
             with self._lock:
-                registration = self._registrations.get(binding_id)
+                registration = self._registrations.get(serial)
                 if registration is None or self._closed:
                     return
                 configuration = registration.configuration
@@ -298,11 +299,11 @@ class AdbTransportBindingSupervisor:
                     "preparation_factory must return an ADB transport preparation executor"
                 )
             result = orchestrator.prepare(
-                AdbTransportPreparation(configuration.server_id, configuration.binding_id),
+                AdbTransportPreparation(configuration.server_id, configuration.serial),
                 preparation_policy,
             )
             with self._lock:
-                registration = self._registrations.get(binding_id)
+                registration = self._registrations.get(serial)
                 result_is_current = (
                     registration is not None
                     and not self._closed
@@ -316,7 +317,7 @@ class AdbTransportBindingSupervisor:
                     self._apply_snapshot(
                         result.observation_session_id,
                         result.final_snapshot,
-                        binding_id=binding_id,
+                        serial=serial,
                     )
             else:
                 self._bus.publish(
@@ -325,7 +326,7 @@ class AdbTransportBindingSupervisor:
         finally:
             relaunch = False
             with self._lock:
-                registration = self._registrations.get(binding_id)
+                registration = self._registrations.get(serial)
                 if registration is not None and registration.recovery_thread is current_thread():
                     registration.recovery_thread = None
                     relaunch = (
@@ -339,7 +340,7 @@ class AdbTransportBindingSupervisor:
                     if relaunch:
                         registration.recovery_attempted_for_absence = True
             if relaunch:
-                self._launch_recovery(binding_id)
+                self._launch_recovery(serial)
 
 
 __all__ = ["AdbTransportBindingSupervisor", "AdbTransportPreparationExecutor"]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from adb.configuration import AdbServerId, AdbTransportBindingId
+from adb.configuration import AdbServerId
 from adb.transport.inventory import (
     AdbConnectionState,
     AdbConnectionType,
@@ -10,13 +10,13 @@ from adb.transport.inventory import (
     AdbTrackedDevice,
 )
 from adb.server import AdbMdnsBackend, AdbServerEndpoint, AdbServerStatus, AdbUsbBackend
-from adb.transport import AdbTransportId
+from adb.transport import AdbDeviceSerial, AdbTransportId
 
 
-class AdbConfigurationIdentityTests(unittest.TestCase):
-    def test_configuration_identities_are_separate_from_native_facts(self) -> None:
+class AdbIdentityTests(unittest.TestCase):
+    def test_server_id_is_caller_owned_while_serial_is_native_selection(self) -> None:
         self.assertEqual(str(AdbServerId(" local-adb ")), "local-adb")
-        self.assertEqual(str(AdbTransportBindingId(" emulator ")), "emulator")
+        self.assertEqual(str(AdbDeviceSerial(" emulator-5554 ")), "emulator-5554")
 
 
 class AdbTrackedDeviceTests(unittest.TestCase):
