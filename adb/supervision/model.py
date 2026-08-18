@@ -6,6 +6,7 @@ from numbers import Real
 from uuid import uuid4
 
 from adb.server.lifecycle import AdbServerEnsurePolicy
+from adb.transport.orchestration import AdbTransportPreparationPolicy
 
 
 def _normalize_positive_seconds(value: object, *, field_name: str) -> float:
@@ -24,6 +25,21 @@ def _normalize_required_text(value: object, *, field_name: str) -> str:
     if not normalized:
         raise ValueError(f"{field_name} cannot be empty")
     return normalized
+
+
+@dataclass(frozen=True, slots=True)
+class AdbTransportBindingSupervisionPolicy:
+    """Long-lived binding projection with optional one-shot recovery per absence episode."""
+
+    preparation_policy: AdbTransportPreparationPolicy | None = None
+
+    def __post_init__(self) -> None:
+        if self.preparation_policy is not None and not isinstance(
+            self.preparation_policy, AdbTransportPreparationPolicy
+        ):
+            raise TypeError(
+                "preparation_policy must be AdbTransportPreparationPolicy or None"
+            )
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -112,6 +128,7 @@ class AdbTransportInventoryObservationSupervisionPolicy:
 
 
 __all__ = [
+    "AdbTransportBindingSupervisionPolicy",
     "AdbTransportInventoryObservationEstablishmentCycleId",
     "AdbTransportInventoryObservationSupervisionPolicy",
 ]

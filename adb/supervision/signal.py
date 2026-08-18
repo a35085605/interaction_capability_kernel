@@ -5,6 +5,61 @@ from typing import TypeAlias
 
 from adb.configuration import AdbServerId
 from adb.supervision.model import AdbTransportInventoryObservationEstablishmentCycleId
+from adb.transport.binding import (
+    AdbTransportBindingConfiguration,
+    AdbTransportBindingResolution,
+)
+from adb.transport.observation.contracts import AdbObservationSessionId
+from adb.transport.orchestration import (
+    AdbTransportPreparationResult,
+    AdbTransportPreparationStatus,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class AdbTransportBindingResolutionChanged:
+    """Signal carrying one registered binding projection within an observation generation."""
+
+    session_id: AdbObservationSessionId
+    previous: AdbTransportBindingResolution | None
+    current: AdbTransportBindingResolution
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.session_id, AdbObservationSessionId):
+            raise TypeError("session_id must be AdbObservationSessionId")
+        if self.previous is not None and not isinstance(
+            self.previous, AdbTransportBindingResolution
+        ):
+            raise TypeError("previous must be AdbTransportBindingResolution or None")
+        if not isinstance(self.current, AdbTransportBindingResolution):
+            raise TypeError("current must be AdbTransportBindingResolution")
+        if self.current.configuration.server_id != self.session_id.server_id:
+            raise ValueError("binding resolution server_id must match observation session")
+        if self.previous is not None and (
+            self.previous.configuration.binding_id
+            != self.current.configuration.binding_id
+        ):
+            raise ValueError("binding resolution change must keep one binding identity")
+
+
+@dataclass(frozen=True, slots=True)
+class AdbTransportBindingRecoveryExhausted:
+    """Signal that automatic recovery ended unsatisfied for one registered binding."""
+
+    configuration: AdbTransportBindingConfiguration
+    result: AdbTransportPreparationResult
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.configuration, AdbTransportBindingConfiguration):
+            raise TypeError("configuration must be AdbTransportBindingConfiguration")
+        if not isinstance(self.result, AdbTransportPreparationResult):
+            raise TypeError("result must be AdbTransportPreparationResult")
+        if self.result.operation.server_id != self.configuration.server_id:
+            raise ValueError("recovery result server_id must match binding configuration")
+        if self.result.operation.binding_id != self.configuration.binding_id:
+            raise ValueError("recovery result binding_id must match binding configuration")
+        if self.result.status is AdbTransportPreparationStatus.SATISFIED:
+            raise ValueError("recovery exhausted signal requires an unsatisfied result")
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,13 +111,17 @@ class AdbTransportInventoryObservationEstablishmentExhausted:
 
 
 AdbSupervisionSignal: TypeAlias = (
-    AdbTransportInventoryObservationEstablishmentRetryDue
+    AdbTransportBindingResolutionChanged
+    | AdbTransportBindingRecoveryExhausted
+    | AdbTransportInventoryObservationEstablishmentRetryDue
     | AdbTransportInventoryObservationEstablishmentExhausted
 )
 
 
 __all__ = [
     "AdbSupervisionSignal",
+    "AdbTransportBindingRecoveryExhausted",
+    "AdbTransportBindingResolutionChanged",
     "AdbTransportInventoryObservationEstablishmentExhausted",
     "AdbTransportInventoryObservationEstablishmentRetryDue",
 ]
