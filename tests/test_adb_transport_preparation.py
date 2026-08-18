@@ -3,11 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import unittest
 
-from adb.configuration import (
-    AdbServerConfiguration,
-    AdbServerId,
-    AdbTransportBindingId,
-)
+from adb.configuration import AdbServerConfiguration, AdbServerId
 from adb.server import AdbServerEndpoint
 from adb.transport.binding import (
     AdbTransportBindingConfiguration,
@@ -33,7 +29,7 @@ from adb.transport.orchestration import (
     AdbTransportPresenceSatisfaction,
 )
 from adb.transport.preparation import AdbTransportPreparationOrchestrator
-from adb.transport.selection import AdbDeviceSerial, AdbTransportBySerial, AdbTransportId
+from adb.transport.selection import AdbDeviceSerial, AdbTransportId
 from adb.transport.signal import AdbTransportPreparationCompleted
 from eventing.adapters import InMemoryEventBus
 from native_attempt import (
@@ -53,8 +49,7 @@ def _server_configuration() -> AdbServerConfiguration:
 def _binding_configuration(*, connect_address: str | None = "192.0.2.10:5555"):
     return AdbTransportBindingConfiguration(
         server_id=AdbServerId("local-main"),
-        binding_id=AdbTransportBindingId("phone"),
-        inventory_selector=AdbTransportBySerial(AdbDeviceSerial("device-1")),
+        serial=AdbDeviceSerial("device-1"),
         connect_address=connect_address,
     )
 
@@ -147,6 +142,13 @@ class AdbTransportBindingResolutionTests(unittest.TestCase):
         self.assertIs(ambiguous.status, AdbTransportBindingResolutionStatus.AMBIGUOUS)
         self.assertEqual(len(ambiguous.matches), 2)
 
+    def test_binding_configuration_requires_serial_not_runtime_transport_id(self) -> None:
+        with self.assertRaisesRegex(TypeError, "AdbDeviceSerial"):
+            AdbTransportBindingConfiguration(
+                server_id=AdbServerId("local-main"),
+                serial=AdbTransportId(27),  # type: ignore[arg-type]
+            )
+
 
 class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -155,7 +157,7 @@ class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
         self.observation = _Observation(self.session_id)
         self.operation = AdbTransportPreparation(
             AdbServerId("local-main"),
-            AdbTransportBindingId("phone"),
+            AdbDeviceSerial("device-1"),
         )
         self.policy = AdbTransportPreparationPolicy(
             timeout_seconds=0.2,
@@ -298,9 +300,6 @@ class AdbTransportPreparationOrchestratorTests(unittest.TestCase):
             self._publish(AdbDevicesSnapshot((_row(AdbConnectionState.DEVICE, 31),)))
 
         self.bus.subscribe(AdbTransportInventoryObservationStarted, lambda event: None)
-        # Publish after preparation subscribes by triggering from a connector-free helper thread
-        # is unnecessary: the current row is present, so schedule the replacement through a
-        # small event callback emitted before the blocking wait begins.
         original_read = orchestrator._snapshot_reader.read
 
         def read_and_replace(endpoint):
