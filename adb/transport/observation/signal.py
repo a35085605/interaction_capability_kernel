@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.transport.inventory.domain import AdbDevicesSnapshot
+from adb.transport.devices.domain import AdbDevicesSnapshot
 from adb.transport.observation.contracts import AdbObservationSessionId
 
 
@@ -31,7 +31,7 @@ def _normalize_optional_text(value: object, *, field_name: str) -> str | None:
     return normalized
 
 
-class AdbTransportInventoryObservationFailure(str, Enum):
+class AdbDevicesObservationFailure(str, Enum):
     """Typed reason one transport-inventory observation session terminated abnormally."""
 
     SERVER_CONNECTION = "server_connection"
@@ -40,7 +40,7 @@ class AdbTransportInventoryObservationFailure(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationStarted:
+class AdbDevicesObservationStarted:
     """Signal that one transport-inventory observation session entered stream mode."""
 
     endpoint: AdbServerEndpoint
@@ -54,7 +54,7 @@ class AdbTransportInventoryObservationStarted:
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationStopped:
+class AdbDevicesObservationStopped:
     """Signal that observation ended without implying transport disappearance."""
 
     endpoint: AdbServerEndpoint
@@ -68,12 +68,12 @@ class AdbTransportInventoryObservationStopped:
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationFailed:
+class AdbDevicesObservationFailed:
     """Signal that observation failed without synthesizing server or transport state."""
 
     endpoint: AdbServerEndpoint
     session_id: AdbObservationSessionId
-    failure: AdbTransportInventoryObservationFailure
+    failure: AdbDevicesObservationFailure
     diagnostic: str | None = None
 
     def __post_init__(self) -> None:
@@ -81,8 +81,8 @@ class AdbTransportInventoryObservationFailed:
         _require_session_id(self.session_id)
         if self.session_id.endpoint != self.endpoint:
             raise ValueError("session_id endpoint must match signal endpoint")
-        if not isinstance(self.failure, AdbTransportInventoryObservationFailure):
-            raise TypeError("failure must be AdbTransportInventoryObservationFailure")
+        if not isinstance(self.failure, AdbDevicesObservationFailure):
+            raise TypeError("failure must be AdbDevicesObservationFailure")
         object.__setattr__(
             self,
             "diagnostic",
@@ -94,7 +94,7 @@ class AdbTransportInventoryObservationFailed:
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventorySnapshotObserved:
+class AdbDevicesSnapshotObserved:
     """Signal carrying one complete snapshot emitted by ADB track-devices."""
 
     endpoint: AdbServerEndpoint
@@ -111,9 +111,9 @@ class AdbTransportInventorySnapshotObserved:
 
 
 __all__ = [
-    "AdbTransportInventoryObservationFailed",
-    "AdbTransportInventoryObservationFailure",
-    "AdbTransportInventoryObservationStarted",
-    "AdbTransportInventoryObservationStopped",
-    "AdbTransportInventorySnapshotObserved",
+    "AdbDevicesObservationFailed",
+    "AdbDevicesObservationFailure",
+    "AdbDevicesObservationStarted",
+    "AdbDevicesObservationStopped",
+    "AdbDevicesSnapshotObserved",
 ]

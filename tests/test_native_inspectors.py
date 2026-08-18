@@ -4,7 +4,7 @@ import inspect
 import unittest
 
 from adb.server.status.query import AdbServerStatusReader
-from adb.transport.inventory.query import AdbDevicesSnapshotReader, AdbTrackedDeviceLookup
+from adb.transport.devices.query import AdbDevicesSnapshotReader, AdbTrackedDeviceLookup
 from adb.transport.query import AdbTransportFeaturesReader
 from android.adb.query import (
     AdbBootStateInspector,

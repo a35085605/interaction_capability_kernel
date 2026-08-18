@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from adb.transport.observation.source import AdbTrackDevicesSource
-from adb.transport.inventory import (
+from adb.transport.devices import (
     AdbConnectionState,
     AdbConnectionType,
     AdbDevicesSnapshot,

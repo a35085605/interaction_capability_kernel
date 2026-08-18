@@ -21,8 +21,8 @@ Native domains expose atomic query contracts keyed by domain-owned identities or
 DesktopInspector.inspect()                                             -> DesktopState
 WindowInspector.inspect(WindowId)                                      -> WindowState | None
 adb.server AdbServerStatusReader.read(endpoint)                        -> AdbServerStatus
-adb.transport.inventory AdbDevicesSnapshotReader.read(endpoint)        -> AdbDevicesSnapshot
-adb.transport.inventory AdbTrackedDeviceLookup.find(endpoint, selector)
+adb.transport.devices AdbDevicesSnapshotReader.read(endpoint)        -> AdbDevicesSnapshot
+adb.transport.devices AdbTrackedDeviceLookup.find(endpoint, selector)
                                                                        -> AdbTrackedDevice | None
 adb.transport AdbTransportFeaturesReader.read(endpoint, selector)      -> AdbTransportFeatures
 android.adb AdbBootStateInspector.inspect(endpoint, selector)          -> AndroidBootState

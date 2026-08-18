@@ -5,7 +5,7 @@ from collections.abc import Callable
 from adb._internal.client import AdbServiceClient
 from adb._internal.proto import parse_devices_snapshot
 from adb.server.endpoint import AdbServerEndpoint
-from adb.transport.inventory.domain import AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices.domain import AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.selection import (
     AdbTransportById,
     AdbTransportBySerial,

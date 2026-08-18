@@ -16,14 +16,14 @@ from adb.server.lifecycle import (
 )
 from adb.server.signal import AdbServerCommandCompleted, AdbServerEnsureCompleted, AdbServerProbeCompleted
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.inventory.domain import AdbDevicesSnapshot
+from adb.transport.devices.domain import AdbDevicesSnapshot
 from adb.transport.observation import signal as observation_signal
 from adb.transport.observation.signal import (
-    AdbTransportInventoryObservationFailed,
-    AdbTransportInventoryObservationFailure,
-    AdbTransportInventoryObservationStarted,
-    AdbTransportInventoryObservationStopped,
-    AdbTransportInventorySnapshotObserved,
+    AdbDevicesObservationFailed,
+    AdbDevicesObservationFailure,
+    AdbDevicesObservationStarted,
+    AdbDevicesObservationStopped,
+    AdbDevicesSnapshotObserved,
 )
 from adb.transport.connection import AdbTransportReconnect
 from adb.transport.selection import AdbDeviceSerial, AdbTransportBySerial
@@ -70,16 +70,16 @@ class AdbServerSignalTests(unittest.TestCase):
         self.assertIs(AdbServerEnsureCompleted(result).result, result)
 
 
-class AdbTransportInventorySignalTests(unittest.TestCase):
+class AdbDevicesSignalTests(unittest.TestCase):
     def test_observation_session_signals_carry_endpoint_and_session_identity(self) -> None:
         endpoint = AdbServerEndpoint("127.0.0.1", 5037)
         session_id = AdbObservationSessionId(endpoint, 1)
-        self.assertIs(AdbTransportInventoryObservationStarted(endpoint, session_id).endpoint, endpoint)
-        self.assertIs(AdbTransportInventoryObservationStopped(endpoint, session_id).endpoint, endpoint)
-        failed = AdbTransportInventoryObservationFailed(
+        self.assertIs(AdbDevicesObservationStarted(endpoint, session_id).endpoint, endpoint)
+        self.assertIs(AdbDevicesObservationStopped(endpoint, session_id).endpoint, endpoint)
+        failed = AdbDevicesObservationFailed(
             endpoint,
             session_id,
-            AdbTransportInventoryObservationFailure.SERVER_CONNECTION,
+            AdbDevicesObservationFailure.SERVER_CONNECTION,
             " socket lost ",
         )
         self.assertEqual(failed.diagnostic, "socket lost")
@@ -90,13 +90,13 @@ class AdbTransportInventorySignalTests(unittest.TestCase):
         other = AdbServerEndpoint("127.0.0.1", 5040)
         session_id = AdbObservationSessionId(endpoint, 1)
         with self.assertRaisesRegex(ValueError, "endpoint"):
-            AdbTransportInventoryObservationStarted(other, session_id)
+            AdbDevicesObservationStarted(other, session_id)
 
     def test_snapshot_signal_preserves_complete_native_inventory_fact(self) -> None:
         endpoint = AdbServerEndpoint()
         session_id = AdbObservationSessionId(endpoint, 1)
         snapshot = AdbDevicesSnapshot()
-        signal = AdbTransportInventorySnapshotObserved(endpoint, session_id, snapshot)
+        signal = AdbDevicesSnapshotObserved(endpoint, session_id, snapshot)
         self.assertIs(signal.snapshot, snapshot)
 
     def test_observation_signal_module_does_not_expose_row_lifecycle_vocabulary(self) -> None:

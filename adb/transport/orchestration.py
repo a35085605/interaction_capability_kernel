@@ -6,7 +6,7 @@ import math
 from numbers import Integral, Real
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.transport.inventory.domain import (
+from adb.transport.devices.domain import (
     AdbConnectionState,
     AdbDevicesSnapshot,
     AdbTrackedDevice,

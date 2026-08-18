@@ -4,7 +4,7 @@ import unittest
 
 from adb._internal.proto import parse_server_status
 from adb.server.status.adapters import SmartSocketAdbServerStatusReader
-from adb.transport.inventory.adapters import SmartSocketAdbDevicesSnapshotReader
+from adb.transport.devices.adapters import SmartSocketAdbDevicesSnapshotReader
 from adb.transport.adapters import SmartSocketAdbTransportFeaturesReader
 from adb.server import AdbMdnsBackend, AdbServerEndpoint, AdbUsbBackend
 from adb.transport import AdbTransportId

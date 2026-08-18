@@ -2,22 +2,22 @@
 
 from adb.supervision.model import (
     AdbTransportBindingSupervisionPolicy,
-    AdbTransportInventoryObservationEstablishmentCycleId,
-    AdbTransportInventoryObservationSupervisionPolicy,
+    AdbDevicesObservationEstablishmentCycleId,
+    AdbDevicesObservationSupervisionPolicy,
 )
 from adb.supervision.signal import (
     AdbSupervisionSignal,
     AdbTransportBindingRecoveryExhausted,
     AdbTransportBindingResolutionChanged,
-    AdbTransportInventoryObservationEstablishmentExhausted,
-    AdbTransportInventoryObservationEstablishmentRetryDue,
+    AdbDevicesObservationEstablishmentExhausted,
+    AdbDevicesObservationEstablishmentRetryDue,
 )
 from adb.supervision.transport_binding import (
     AdbTransportBindingSupervisor,
     AdbTransportPreparationExecutor,
 )
-from adb.supervision.transport_inventory_observation import (
-    AdbTransportInventoryObservationSupervisor,
+from adb.supervision.devices_observation import (
+    AdbDevicesObservationSupervisor,
 )
 
 __all__ = [
@@ -26,10 +26,10 @@ __all__ = [
     "AdbTransportBindingResolutionChanged",
     "AdbTransportBindingSupervisionPolicy",
     "AdbTransportBindingSupervisor",
-    "AdbTransportInventoryObservationEstablishmentCycleId",
-    "AdbTransportInventoryObservationEstablishmentExhausted",
-    "AdbTransportInventoryObservationEstablishmentRetryDue",
-    "AdbTransportInventoryObservationSupervisionPolicy",
-    "AdbTransportInventoryObservationSupervisor",
+    "AdbDevicesObservationEstablishmentCycleId",
+    "AdbDevicesObservationEstablishmentExhausted",
+    "AdbDevicesObservationEstablishmentRetryDue",
+    "AdbDevicesObservationSupervisionPolicy",
+    "AdbDevicesObservationSupervisor",
     "AdbTransportPreparationExecutor",
 ]

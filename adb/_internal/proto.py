@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from adb.transport.inventory.domain import (
+from adb.transport.devices.domain import (
     AdbConnectionState,
     AdbConnectionType,
     AdbDevicesSnapshot,

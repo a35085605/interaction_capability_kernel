@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from adb.transport.inventory import AdbConnectionState, AdbConnectionType, AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices import AdbConnectionState, AdbConnectionType, AdbDevicesSnapshot, AdbTrackedDevice
 from adb.server import AdbMdnsBackend, AdbServerEndpoint, AdbServerStatus, AdbUsbBackend
 from adb.transport import AdbDeviceSerial, AdbTransportId
 

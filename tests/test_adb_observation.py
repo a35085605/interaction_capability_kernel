@@ -4,7 +4,7 @@ from collections.abc import Iterator
 import importlib.util
 import unittest
 
-from adb.transport.inventory import AdbConnectionState, AdbDevicesSnapshot, AdbTrackedDevice
+from adb.transport.devices import AdbConnectionState, AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.observation import AdbDevicesSnapshotSource
 
 
@@ -39,7 +39,8 @@ class AdbObservationContractTests(unittest.TestCase):
 
     def test_tracked_device_is_not_a_peer_adb_namespace(self) -> None:
         self.assertIsNone(importlib.util.find_spec("adb.tracked_device"))
-        self.assertIsNotNone(importlib.util.find_spec("adb.transport.inventory"))
+        self.assertIsNone(importlib.util.find_spec("adb.transport.inventory"))
+        self.assertIsNotNone(importlib.util.find_spec("adb.transport.devices"))
         self.assertIsNotNone(importlib.util.find_spec("adb.transport.observation"))
 
 

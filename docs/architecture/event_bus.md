@@ -65,11 +65,11 @@ fresh server probe
               result
 ```
 
-`AdbTransportInventoryObservationEstablishmentOrchestrator` composes that server sub-episode
+`AdbDevicesObservationEstablishmentOrchestrator` composes that server sub-episode
 with one new `track-devices` observation generation. It is itself bounded by one authoritative
 establishment deadline and owns no retry/backoff state. A call to
-`AdbTransportInventoryObservationController.start()` only requests a new generation;
-establishment is satisfied only after the matching `AdbTransportInventoryObservationStarted`
+`AdbDevicesObservationController.start()` only requests a new generation;
+establishment is satisfied only after the matching `AdbDevicesObservationStarted`
 signal proves that the tracker entered stream mode. A matching failure or stop before that
 evidence terminates the episode as unsatisfied.
 
@@ -95,25 +95,25 @@ fresh server probe
       SATISFIED FAILED   TIMED_OUT
 ```
 
-`AdbTransportInventoryObservationSupervisor` under `adb.supervision` is the long-lived lifecycle
+`AdbDevicesObservationSupervisor` under `adb.supervision` is the long-lived lifecycle
 owner around those bounded establishment episodes. Startup initialization and runtime
 server-connection re-establishment use the same establishment path. The supervisor retains one
-`AdbTransportInventoryObservationEstablishmentCycleId` across retry attempts and owns
+`AdbDevicesObservationEstablishmentCycleId` across retry attempts and owns
 retry/backoff, jitter, attempt budgets, current-generation filtering, and close behavior. It
 clears the cycle only after an establishment episode is actually satisfied, so a server that
 remains probeable while new tracker generations repeatedly fail to establish cannot reset the
 retry budget merely by allocating another generation id.
 
-Runtime `AdbTransportInventoryObservationFailed(SERVER_CONNECTION)` signals are handled outside
+Runtime `AdbDevicesObservationFailed(SERVER_CONNECTION)` signals are handled outside
 the active `InMemoryEventBus` dispatch stack before waiting for establishment evidence. Scheduled
-`adb.supervision.signal.AdbTransportInventoryObservationEstablishmentRetryDue` signals follow the
+`adb.supervision.signal.AdbDevicesObservationEstablishmentRetryDue` signals follow the
 same rule. `SERVICE` and `PROTOCOL` failures do not start the runtime re-establishment cycle.
 Server ensure remains a sub-step of an establishment episode rather than the identity of the
 long-lived supervision cycle.
 
 `AdbObservationSessionId` combines the `AdbServerEndpoint` with a monotonically increasing
-generation. `AdbTransportInventoryObservation*` lifecycle signals and
-`AdbTransportInventorySnapshotObserved` carry this identity, allowing the supervisor and bounded
+generation. `AdbDevicesObservation*` lifecycle signals and
+`AdbDevicesSnapshotObserved` carry this identity, allowing the supervisor and bounded
 episodes to ignore evidence for another generation. A newly established session is also a new
 snapshot baseline; consumers must not diff snapshots across session generations.
 

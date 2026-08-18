@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TypeAlias
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.supervision.model import AdbTransportInventoryObservationEstablishmentCycleId
+from adb.supervision.model import AdbDevicesObservationEstablishmentCycleId
 from adb.transport.binding import (
     AdbTransportBindingConfiguration,
     AdbTransportBindingResolution,
@@ -63,11 +63,11 @@ class AdbTransportBindingRecoveryExhausted:
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationEstablishmentRetryDue:
+class AdbDevicesObservationEstablishmentRetryDue:
     """Signal delivered when one scheduled observation-establishment retry becomes due."""
 
     endpoint: AdbServerEndpoint
-    cycle_id: AdbTransportInventoryObservationEstablishmentCycleId
+    cycle_id: AdbDevicesObservationEstablishmentCycleId
     attempt_number: int
 
     def __post_init__(self) -> None:
@@ -75,10 +75,10 @@ class AdbTransportInventoryObservationEstablishmentRetryDue:
             raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(
             self.cycle_id,
-            AdbTransportInventoryObservationEstablishmentCycleId,
+            AdbDevicesObservationEstablishmentCycleId,
         ):
             raise TypeError(
-                "cycle_id must be AdbTransportInventoryObservationEstablishmentCycleId"
+                "cycle_id must be AdbDevicesObservationEstablishmentCycleId"
             )
         if isinstance(self.attempt_number, bool) or not isinstance(self.attempt_number, int):
             raise TypeError("attempt_number must be an integer")
@@ -87,11 +87,11 @@ class AdbTransportInventoryObservationEstablishmentRetryDue:
 
 
 @dataclass(frozen=True, slots=True)
-class AdbTransportInventoryObservationEstablishmentExhausted:
+class AdbDevicesObservationEstablishmentExhausted:
     """Signal that an observation-establishment cycle exhausted its attempt budget."""
 
     endpoint: AdbServerEndpoint
-    cycle_id: AdbTransportInventoryObservationEstablishmentCycleId
+    cycle_id: AdbDevicesObservationEstablishmentCycleId
     attempts: int
 
     def __post_init__(self) -> None:
@@ -99,10 +99,10 @@ class AdbTransportInventoryObservationEstablishmentExhausted:
             raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(
             self.cycle_id,
-            AdbTransportInventoryObservationEstablishmentCycleId,
+            AdbDevicesObservationEstablishmentCycleId,
         ):
             raise TypeError(
-                "cycle_id must be AdbTransportInventoryObservationEstablishmentCycleId"
+                "cycle_id must be AdbDevicesObservationEstablishmentCycleId"
             )
         if isinstance(self.attempts, bool) or not isinstance(self.attempts, int):
             raise TypeError("attempts must be an integer")
@@ -113,8 +113,8 @@ class AdbTransportInventoryObservationEstablishmentExhausted:
 AdbSupervisionSignal: TypeAlias = (
     AdbTransportBindingResolutionChanged
     | AdbTransportBindingRecoveryExhausted
-    | AdbTransportInventoryObservationEstablishmentRetryDue
-    | AdbTransportInventoryObservationEstablishmentExhausted
+    | AdbDevicesObservationEstablishmentRetryDue
+    | AdbDevicesObservationEstablishmentExhausted
 )
 
 
@@ -122,6 +122,6 @@ __all__ = [
     "AdbSupervisionSignal",
     "AdbTransportBindingRecoveryExhausted",
     "AdbTransportBindingResolutionChanged",
-    "AdbTransportInventoryObservationEstablishmentExhausted",
-    "AdbTransportInventoryObservationEstablishmentRetryDue",
+    "AdbDevicesObservationEstablishmentExhausted",
+    "AdbDevicesObservationEstablishmentRetryDue",
 ]
