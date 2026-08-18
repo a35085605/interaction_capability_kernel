@@ -12,7 +12,7 @@ from adb.transport.inventory.domain import (
     AdbTrackedDevice,
 )
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.selection import AdbDeviceSerial, AdbTransportId
+from adb.transport.selection import AdbDeviceSerial
 from native_attempt import NativeAttemptResult
 
 
@@ -136,8 +136,6 @@ class AdbTransportPreparationStatus(str, Enum):
     TIMED_OUT = "timed_out"
     BLOCKED = "blocked"
     AMBIGUOUS = "ambiguous"
-    TRANSPORT_LOST = "transport_lost"
-    TRANSPORT_REPLACED = "transport_replaced"
     OBSERVATION_FAILED = "observation_failed"
     OBSERVATION_STOPPED = "observation_stopped"
     OBSERVATION_REPLACED = "observation_replaced"
@@ -170,7 +168,6 @@ class AdbTransportPreparationResult:
     attempts: tuple[NativeAttemptResult, ...]
     final_snapshot: AdbDevicesSnapshot | None = None
     final_row: AdbTrackedDevice | None = None
-    pinned_transport_id: AdbTransportId | None = None
     diagnostic: str | None = None
 
     def __post_init__(self) -> None:
@@ -202,10 +199,6 @@ class AdbTransportPreparationResult:
             raise TypeError("final_snapshot must be AdbDevicesSnapshot or None")
         if self.final_row is not None and not isinstance(self.final_row, AdbTrackedDevice):
             raise TypeError("final_row must be AdbTrackedDevice or None")
-        if self.pinned_transport_id is not None and not isinstance(
-            self.pinned_transport_id, AdbTransportId
-        ):
-            raise TypeError("pinned_transport_id must be AdbTransportId or None")
         object.__setattr__(
             self,
             "diagnostic",
