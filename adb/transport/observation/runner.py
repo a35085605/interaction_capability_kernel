@@ -4,7 +4,6 @@ from collections.abc import Callable
 from threading import Lock, Thread, current_thread
 from typing import Protocol, runtime_checkable
 
-from adb.configuration import AdbServerConfiguration
 from adb.server.endpoint import AdbServerEndpoint
 from adb.transport.observation.contracts import (
     AdbObservationProtocolError,
@@ -54,17 +53,17 @@ class AdbTransportInventoryObservationRunner:
 
     def __init__(
         self,
-        configuration: AdbServerConfiguration,
+        endpoint: AdbServerEndpoint,
         publisher: EventPublisher,
         *,
         _source_factory: _SourceFactory = _default_source_factory,
         _thread_factory: _ThreadFactory = _default_thread_factory,
     ) -> None:
-        if not isinstance(configuration, AdbServerConfiguration):
-            raise TypeError("configuration must be AdbServerConfiguration")
+        if not isinstance(endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(publisher, EventPublisher):
             raise TypeError("publisher must satisfy EventPublisher")
-        self.configuration = configuration
+        self.endpoint = endpoint
         self._publisher = publisher
         self._source_factory = _source_factory
         self._thread_factory = _thread_factory
@@ -90,10 +89,10 @@ class AdbTransportInventoryObservationRunner:
                 raise RuntimeError("an ADB observation session is already active")
             self._generation += 1
             session_id = AdbObservationSessionId(
-                self.configuration.server_id,
+                self.endpoint,
                 self._generation,
             )
-            source = self._source_factory(self.configuration.endpoint)
+            source = self._source_factory(self.endpoint)
             if not isinstance(source, AdbTrackDevicesSource):
                 raise TypeError("source factory must return AdbTrackDevicesSource")
             thread = self._thread_factory(
@@ -101,7 +100,7 @@ class AdbTransportInventoryObservationRunner:
                 args=(session_id, source),
                 name=(
                     "adb-track-devices-"
-                    f"{self.configuration.server_id.value}-{session_id.generation}"
+                    f"{self.endpoint.host}-{self.endpoint.port}-{session_id.generation}"
                 ),
             )
             self._current_session_id = session_id
@@ -133,7 +132,7 @@ class AdbTransportInventoryObservationRunner:
         session_id: AdbObservationSessionId,
         source: AdbTrackDevicesSource,
     ) -> None:
-        endpoint = self.configuration.endpoint
+        endpoint = self.endpoint
         session: AdbTrackDevicesSession | None = None
         terminal: object | None = None
         try:

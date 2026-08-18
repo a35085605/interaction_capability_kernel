@@ -5,7 +5,7 @@ from collections.abc import Callable
 from threading import Condition
 from time import monotonic
 
-from adb.configuration import AdbServerConfiguration
+from adb.server.endpoint import AdbServerEndpoint
 from adb.errors import AdbError
 from adb.transport.binding import (
     AdbTransportBindingConfiguration,
@@ -52,7 +52,7 @@ class AdbTransportPreparationOrchestrator:
 
     def __init__(
         self,
-        server_configuration: AdbServerConfiguration,
+        endpoint: AdbServerEndpoint,
         binding_configuration: AdbTransportBindingConfiguration,
         snapshot_reader: AdbDevicesSnapshotReader,
         connector: AdbTcpConnector,
@@ -61,12 +61,12 @@ class AdbTransportPreparationOrchestrator:
         *,
         _monotonic: _MonotonicClock = monotonic,
     ) -> None:
-        if not isinstance(server_configuration, AdbServerConfiguration):
-            raise TypeError("server_configuration must be AdbServerConfiguration")
+        if not isinstance(endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(binding_configuration, AdbTransportBindingConfiguration):
             raise TypeError("binding_configuration must be AdbTransportBindingConfiguration")
-        if binding_configuration.server_id != server_configuration.server_id:
-            raise ValueError("binding configuration server_id does not match ADB server")
+        if binding_configuration.endpoint != endpoint:
+            raise ValueError("binding configuration endpoint does not match ADB server endpoint")
         if not callable(getattr(snapshot_reader, "read", None)):
             raise TypeError("snapshot_reader must provide read()")
         if not callable(getattr(connector, "connect", None)):
@@ -77,7 +77,7 @@ class AdbTransportPreparationOrchestrator:
             raise TypeError("event_bus must satisfy EventBus")
         if not isinstance(observation, AdbTransportInventoryObservationController):
             raise TypeError("observation must satisfy observation controller")
-        self.server_configuration = server_configuration
+        self.endpoint = endpoint
         self.binding_configuration = binding_configuration
         self._snapshot_reader = snapshot_reader
         self._connector = connector
@@ -94,16 +94,16 @@ class AdbTransportPreparationOrchestrator:
             raise TypeError("operation must be AdbTransportPreparation")
         if not isinstance(policy, AdbTransportPreparationPolicy):
             raise TypeError("policy must be AdbTransportPreparationPolicy")
-        if operation.server_id != self.server_configuration.server_id:
-            raise ValueError("operation server_id does not match configured ADB server")
+        if operation.endpoint != self.endpoint:
+            raise ValueError("operation endpoint does not match configured ADB server endpoint")
         if operation.serial != self.binding_configuration.serial:
             raise ValueError("operation serial does not match configured ADB transport")
 
         session_id = self._observation.current_session_id
         if session_id is None:
             raise RuntimeError("transport preparation requires an active observation session")
-        if session_id.server_id != operation.server_id:
-            raise ValueError("active observation session belongs to another ADB server")
+        if session_id.endpoint != operation.endpoint:
+            raise ValueError("active observation session belongs to another ADB server endpoint")
 
         deadline = self._monotonic() + policy.timeout_seconds
         condition = Condition()
@@ -154,7 +154,7 @@ class AdbTransportPreparationOrchestrator:
         diagnostic: str | None = None
 
         try:
-            snapshot = self._snapshot_reader.read(self.server_configuration.endpoint)
+            snapshot = self._snapshot_reader.read(self.endpoint)
         except AdbError as exc:
             diagnostic = str(exc) or exc.__class__.__name__
         else:
@@ -213,7 +213,7 @@ class AdbTransportPreparationOrchestrator:
 
             event_session = getattr(event, "session_id", None)
             if isinstance(event_session, AdbObservationSessionId):
-                if event_session.server_id != session_id.server_id:
+                if event_session.endpoint != session_id.endpoint:
                     continue
                 if event_session.generation < session_id.generation:
                     continue

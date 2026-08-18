@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from adb.configuration import AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from adb.supervision.model import AdbTransportInventoryObservationEstablishmentCycleId
 from adb.transport.binding import (
     AdbTransportBindingConfiguration,
@@ -33,8 +33,8 @@ class AdbTransportBindingResolutionChanged:
             raise TypeError("previous must be AdbTransportBindingResolution or None")
         if not isinstance(self.current, AdbTransportBindingResolution):
             raise TypeError("current must be AdbTransportBindingResolution")
-        if self.current.configuration.server_id != self.session_id.server_id:
-            raise ValueError("binding resolution server_id must match observation session")
+        if self.current.configuration.endpoint != self.session_id.endpoint:
+            raise ValueError("binding resolution endpoint must match observation session")
         if self.previous is not None and (
             self.previous.configuration.serial
             != self.current.configuration.serial
@@ -54,8 +54,8 @@ class AdbTransportBindingRecoveryExhausted:
             raise TypeError("configuration must be AdbTransportBindingConfiguration")
         if not isinstance(self.result, AdbTransportPreparationResult):
             raise TypeError("result must be AdbTransportPreparationResult")
-        if self.result.operation.server_id != self.configuration.server_id:
-            raise ValueError("recovery result server_id must match binding configuration")
+        if self.result.operation.endpoint != self.configuration.endpoint:
+            raise ValueError("recovery result endpoint must match binding configuration")
         if self.result.operation.serial != self.configuration.serial:
             raise ValueError("recovery result serial must match binding configuration")
         if self.result.status is AdbTransportPreparationStatus.SATISFIED:
@@ -66,13 +66,13 @@ class AdbTransportBindingRecoveryExhausted:
 class AdbTransportInventoryObservationEstablishmentRetryDue:
     """Signal delivered when one scheduled observation-establishment retry becomes due."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     cycle_id: AdbTransportInventoryObservationEstablishmentCycleId
     attempt_number: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(
             self.cycle_id,
             AdbTransportInventoryObservationEstablishmentCycleId,
@@ -90,13 +90,13 @@ class AdbTransportInventoryObservationEstablishmentRetryDue:
 class AdbTransportInventoryObservationEstablishmentExhausted:
     """Signal that an observation-establishment cycle exhausted its attempt budget."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     cycle_id: AdbTransportInventoryObservationEstablishmentCycleId
     attempts: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(
             self.cycle_id,
             AdbTransportInventoryObservationEstablishmentCycleId,

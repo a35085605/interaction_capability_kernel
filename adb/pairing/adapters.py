@@ -8,22 +8,22 @@ from adb._internal.subprocess import (
     run_adb,
     server_args,
 )
-from adb.configuration import AdbServerConfiguration
+from adb.server.endpoint import AdbServerEndpoint
 from adb.pairing.command import AdbWirelessPair
 from native_attempt import NativeAttemptResult
 
 
 @dataclass(frozen=True, slots=True)
 class SubprocessAdbPairing:
-    """Execute one configured-server ADB pairing command per bounded CLI attempt."""
+    """Execute one endpoint-bound ADB pairing command per bounded CLI attempt."""
 
-    configuration: AdbServerConfiguration
+    endpoint: AdbServerEndpoint
     executable: str = "adb"
     timeout_seconds: float = 10.0
 
     def __post_init__(self) -> None:
-        if not isinstance(self.configuration, AdbServerConfiguration):
-            raise TypeError("configuration must be AdbServerConfiguration")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         object.__setattr__(self, "executable", normalize_executable(self.executable))
         object.__setattr__(self, "timeout_seconds", normalize_timeout(self.timeout_seconds))
 
@@ -33,7 +33,7 @@ class SubprocessAdbPairing:
         return run_adb(
             self.executable,
             self.timeout_seconds,
-            [*server_args(self.configuration), "pair", operation.address],
+            [*server_args(self.endpoint), "pair", operation.address],
             input_text=f"{operation.pairing_code}\n",
         )
 

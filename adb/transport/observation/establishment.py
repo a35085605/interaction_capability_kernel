@@ -9,7 +9,7 @@ from numbers import Real
 from threading import Condition
 from time import monotonic
 
-from adb.configuration import AdbServerConfiguration, AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from adb.server.lifecycle import (
     AdbServerAvailability,
     AdbServerEnsureAvailable,
@@ -85,12 +85,12 @@ class AdbTransportInventoryObservationEstablishmentPolicy:
 class AdbTransportInventoryObservationEstablishment:
     """Request establishment of one configured server's transport-inventory observation."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
     policy: AdbTransportInventoryObservationEstablishmentPolicy
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not isinstance(
             self.policy,
             AdbTransportInventoryObservationEstablishmentPolicy,
@@ -129,8 +129,8 @@ class AdbTransportInventoryObservationEstablishmentResult:
             )
         if not isinstance(self.initial_probe, AdbServerProbeResult):
             raise TypeError("initial_probe must be AdbServerProbeResult")
-        if self.initial_probe.configuration.server_id != self.operation.server_id:
-            raise ValueError("initial probe server_id must match establishment operation")
+        if self.initial_probe.endpoint != self.operation.endpoint:
+            raise ValueError("initial probe endpoint must match establishment operation")
         if self.ensure_result is not None and not isinstance(
             self.ensure_result, AdbServerEnsureResult
         ):
@@ -138,9 +138,9 @@ class AdbTransportInventoryObservationEstablishmentResult:
         if self.observation_session_id is not None:
             if not isinstance(self.observation_session_id, AdbObservationSessionId):
                 raise TypeError("observation_session_id must be AdbObservationSessionId or None")
-            if self.observation_session_id.server_id != self.operation.server_id:
+            if self.observation_session_id.endpoint != self.operation.endpoint:
                 raise ValueError(
-                    "observation session server_id must match establishment operation"
+                    "observation session endpoint must match establishment operation"
                 )
         if self.observation_failure is not None and not isinstance(
             self.observation_failure,
@@ -194,15 +194,15 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
 
     def __init__(
         self,
-        configuration: AdbServerConfiguration,
+        endpoint: AdbServerEndpoint,
         event_bus: EventBus,
         observation: AdbTransportInventoryObservationController,
         ensure_orchestrator: object,
         *,
         _monotonic: _MonotonicClock = monotonic,
     ) -> None:
-        if not isinstance(configuration, AdbServerConfiguration):
-            raise TypeError("configuration must be AdbServerConfiguration")
+        if not isinstance(endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
         if not callable(getattr(event_bus, "subscribe", None)) or not callable(
             getattr(event_bus, "unsubscribe", None)
         ):
@@ -213,7 +213,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             getattr(ensure_orchestrator, "ensure", None)
         ):
             raise TypeError("ensure_orchestrator must provide probe() and ensure()")
-        self.configuration = configuration
+        self.endpoint = endpoint
         self._bus = event_bus
         self._observation = observation
         self._ensure = ensure_orchestrator
@@ -230,8 +230,8 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
             raise TypeError(
                 "operation must be AdbTransportInventoryObservationEstablishment"
             )
-        if operation.server_id != self.configuration.server_id:
-            raise ValueError("operation server_id does not match configured ADB server")
+        if operation.endpoint != self.endpoint:
+            raise ValueError("operation endpoint does not match configured ADB server endpoint")
 
         deadline = self._monotonic() + operation.policy.timeout_seconds
         condition = Condition()
@@ -282,7 +282,7 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
                 requested.probe_interval_seconds,
             )
             ensure_result = self._ensure.ensure(
-                AdbServerEnsureAvailable(operation.server_id, bounded_policy)
+                AdbServerEnsureAvailable(operation.endpoint, bounded_policy)
             )
             if ensure_result.status is not AdbServerEnsureStatus.SATISFIED:
                 status = (
@@ -320,8 +320,8 @@ class AdbTransportInventoryObservationEstablishmentOrchestrator:
                 ensure_result=ensure_result,
                 diagnostic=str(exc),
             )
-        if session_id.server_id != operation.server_id:
-            raise ValueError("started observation belongs to another ADB server")
+        if session_id.endpoint != operation.endpoint:
+            raise ValueError("started observation belongs to another ADB server endpoint")
 
         while True:
             event = self._next_event(condition, events, deadline)

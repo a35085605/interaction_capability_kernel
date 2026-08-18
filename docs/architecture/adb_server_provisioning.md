@@ -1,71 +1,59 @@
-# ADB server provisioning
+# ADB server endpoint provisioning
 
-ADB server provisioning owns the process-local association between a caller-owned
-`AdbServerId` and the `AdbServerEndpoint` used by ADB-native readers, commands, observation,
-and same-domain orchestration.
-
-The provisioning model deliberately keeps the binding immutable for its runtime lifetime.
-Provisioning may choose an endpoint automatically or accept an explicit endpoint, but it does
-not support runtime rebinding.
+ADB server provisioning owns only allocation and reservation of native `AdbServerEndpoint`
+values. It does not own caller identity. A consumer that uses a logical `server_id` keeps the
+`server_id -> AdbServerEndpoint` association in its composition or adapter layer, resolves that
+binding before entering the ADB domain, and passes only the endpoint into ADB contracts.
 
 ```text
-caller
+caller / composition
   │
-  │ server_id + optional endpoint
+  │ caller-owned server_id
   ▼
-ADB server provisioner
+server binding adapter
   │
-  ├── endpoint omitted ──► allocator
+  │ resolve or create binding
+  ▼
+AdbServerEndpoint
   │
-  └── endpoint supplied ─► validate ownership
-              │
-              ▼
-    AdbServerConfiguration
-       server_id + endpoint
-              │
-              ▼
-       ADB operation plane
+  ├── optional endpoint provisioner
+  │       └── reserve native endpoint
+  │
+  ▼
+ADB operation plane
+query / command / observation / orchestration
 ```
 
-## Invariants
+## Ownership boundary
 
-Within one authoritative provisioner:
+The ADB domain knows the native smart-socket endpoint. It does not define a caller-owned server
+identity and does not persist a mapping from logical ids to endpoints. This keeps native ADB
+evidence scoped to native values and makes rebinding policy an explicit concern of the consumer
+that owns the logical identity.
 
-- one `AdbServerId` has at most one active `AdbServerConfiguration`;
-- one exact `AdbServerEndpoint` value is owned by at most one `AdbServerId`;
-- provisioning an existing id with no endpoint reuses the existing binding;
-- provisioning an existing id with the same endpoint also reuses the existing binding;
-- provisioning an existing id with a different endpoint is rejected;
-- provisioning a new id with an endpoint already owned by another id is rejected; and
-- no `rebind` operation exists in this model.
+If a caller changes the endpoint associated with one of its logical ids, that is a caller-side
+binding replacement. Existing ADB observation generations, preparation episodes, and retry
+cycles remain scoped to the endpoint with which they were created; the caller decides when to
+close them and construct new endpoint-scoped components.
 
-The endpoint uniqueness rule compares `AdbServerEndpoint` values. Callers that supply host
-aliases which resolve to the same native socket remain responsible for avoiding that external
-aliasing.
+## Endpoint reservation
 
-## Automatic allocation
+`InMemoryAdbServerProvisioner` reserves distinct `AdbServerEndpoint` values within one
+process-local provisioning scope. `provision()` accepts an optional explicit endpoint; when no
+endpoint is supplied, `SequentialLocalAdbServerEndpointAllocator` selects the first unreserved
+`localhost` port beginning at 5037.
 
-`SequentialLocalAdbServerEndpointAllocator` allocates `localhost` endpoints beginning at port
-5037 and skips endpoint values already reserved by the provisioner. The allocator intentionally
-does not probe operating-system socket availability and does not silently choose another port
-because a native start attempt later fails. Allocation establishes configuration identity;
-server availability remains evidence produced by `adb.server.status` and
-`adb.server.lifecycle`.
+The provisioner deliberately does not probe operating-system socket availability. Reservation
+establishes only endpoint uniqueness in the provisioning scope. Native server availability is
+established separately through `adb.server.status` and `adb.server.lifecycle`.
 
-A different allocation policy can implement `AdbServerEndpointAllocator` and be injected into
-`InMemoryAdbServerProvisioner`.
+An explicit endpoint that is already reserved is rejected with
+`AdbServerEndpointConflictError`. Endpoint exhaustion is reported as
+`AdbServerEndpointExhaustedError`. The provisioner has no `resolve(server_id)` or rebind API
+because caller identity is outside this domain.
 
-## Explicit endpoints
+## Observation identity
 
-A provisioning caller may supply an `AdbServerEndpoint` explicitly. Once accepted, that
-endpoint is part of the immutable `AdbServerConfiguration` for the lifetime of the provisioner.
-Ordinary ADB operations continue to consume the resulting configuration or its endpoint; they
-do not decide how that endpoint was selected.
-
-## Runtime rebinding
-
-Runtime endpoint replacement is intentionally out of scope. Supporting it would introduce a
-separate server-binding incarnation lifecycle and would require fencing long-lived observation,
-preparation, supervision, scheduled retries, and other evidence against binding replacement.
-`AdbObservationSessionId.generation` remains dedicated to observation-baseline replacement and
-does not double as a server-binding epoch.
+`AdbObservationSessionId` is endpoint-scoped: it contains the `AdbServerEndpoint` plus a
+monotonically increasing generation. The generation identifies replacement of the observation
+baseline for that endpoint; it is not a caller-side binding epoch.

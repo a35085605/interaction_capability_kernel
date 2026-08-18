@@ -3,30 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from adb.configuration import AdbServerId
+from adb.server.endpoint import AdbServerEndpoint
 from native_attempt import NativeAttemptResult
 
 
 @dataclass(frozen=True, slots=True)
 class AdbServerStart:
-    """Request one native attempt to start one configured ADB server."""
+    """Request one native attempt to start the ADB server at one endpoint."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
 
 
 @dataclass(frozen=True, slots=True)
 class AdbServerStop:
-    """Request one native attempt to stop one configured ADB server."""
+    """Request one native attempt to stop the ADB server at one endpoint."""
 
-    server_id: AdbServerId
+    endpoint: AdbServerEndpoint
 
     def __post_init__(self) -> None:
-        if not isinstance(self.server_id, AdbServerId):
-            raise TypeError("server_id must be AdbServerId")
+        if not isinstance(self.endpoint, AdbServerEndpoint):
+            raise TypeError("endpoint must be AdbServerEndpoint")
 
 
 class AdbServerStarter(Protocol):
