@@ -97,8 +97,8 @@ class AdbTransportPreparationOrchestrator:
             raise TypeError("policy must be AdbTransportPreparationPolicy")
         if operation.server_id != self.server_configuration.server_id:
             raise ValueError("operation server_id does not match configured ADB server")
-        if operation.binding_id != self.binding_configuration.binding_id:
-            raise ValueError("operation binding_id does not match configured ADB binding")
+        if operation.serial != self.binding_configuration.serial:
+            raise ValueError("operation serial does not match configured ADB transport")
 
         session_id = self._observation.current_session_id
         if session_id is None:
