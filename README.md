@@ -165,9 +165,10 @@ identified device entity. It is one observation row for a server-tracked ADB tra
 no separate lifecycle or command surface. A non-zero `AdbTrackedDevice.transport_id` is the
 server-local native transport identity; the protobuf default `0` means that identity is not
 available in that row. The observation layer publishes complete inventory snapshots rather
-than synthesizing row lifecycle events. Any future inventory projector must not infer
-continuity across different non-zero transport IDs; rows with transport ID zero do not
-establish stable native identity.
+than synthesizing row lifecycle events. Different non-zero transport IDs denote different
+runtime transport instances; a serial-selected binding may nevertheless re-resolve the same
+serial to a different current transport from fresh inventory. Rows with transport ID zero do
+not establish stable native runtime identity.
 
 `AdbServerEndpoint` identifies the smart-socket endpoint queried by host-side ADB clients.
 `AdbServerConfiguration` binds that endpoint to a caller-owned `AdbServerId` for ADB-domain
@@ -181,8 +182,8 @@ Android runtime facts are not folded into `AdbTrackedDevice`.
 `AdbTransportBindingConfiguration` associates one configured server with an `AdbDeviceSerial`
 and an optional TCP connect address. The serial is deliberately independent from the connect
 address; preparation does not assume that the string passed to `adb connect` must later be the
-tracker serial. Runtime `transport_id` values are derived from fresh inventory and may be pinned
-inside a bounded episode to detect transport replacement.
+tracker serial. Runtime `transport_id` values remain fresh inventory facts rather than binding
+configuration or implicit preparation continuity state.
 
 Concrete ADB-backed adapters share a private smart-socket service client. The client is not
 a public raw-shell capability: public queries, capture backends, platform commands, and
@@ -200,11 +201,12 @@ vocabulary. Domain orchestration must not hide multiple native attempts inside o
 Transport preparation is one bounded episode with two distinct gates. The **presence gate**
 resolves the configured binding against complete inventory snapshots and is satisfied by a
 matching row regardless of its `AdbConnectionState`. The **state gate** then applies an
-explicit `AdbTransportPreparationPolicy` to the same episode and observation generation. A
-non-zero `transport_id` pins native identity for that episode; disappearance or replacement is
-reported explicitly rather than silently following another transport. Atomic `adb connect`
-attempt evidence is preserved, but fresh inventory evidence determines whether preparation is
-satisfied.
+explicit `AdbTransportPreparationPolicy` to the same episode and observation generation. Each
+fresh snapshot re-resolves the configured serial, so a serial-selected preparation follows the
+current unique row even when its server-local `transport_id` changes. Exact runtime-transport
+continuity remains available only when a caller explicitly selects with `AdbTransportById`.
+Atomic `adb connect` attempt evidence is preserved, but fresh inventory evidence determines
+whether preparation is satisfied.
 
 `SubprocessAdbPairing` and `SubprocessAdbTransport` are each bound to an
 `AdbServerConfiguration` and pass that configured `-H` / `-P` endpoint to their CLI commands.
