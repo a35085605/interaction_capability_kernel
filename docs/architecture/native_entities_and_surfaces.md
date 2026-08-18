@@ -36,18 +36,22 @@ identity, lifecycle, or commands. `AdbTrackedDevice.transport_id` is an `AdbTran
 non-zero native IDs; the protobuf default remains integer zero. A non-zero transport ID is a
 server-local runtime identity, not a durable configuration key. A row with transport ID zero
 does not establish stable native identity. The observation layer therefore publishes complete
-inventory snapshots rather than row lifecycle events. Any future projector must not infer
-continuity across different non-zero transport IDs.
+inventory snapshots rather than row lifecycle events. Different non-zero transport IDs denote
+different runtime transport instances; a serial-selected binding may still re-resolve the same
+serial to a different current transport from fresh inventory without treating those runtime IDs
+as one continuous transport identity.
 
 `AdbDeviceSerial`, `AdbTransportId`, `AdbTransportBySerial`, and `AdbTransportById` live under
 `adb.transport` and provide deterministic native transport selection. Serial is the persistent
-native selection key used by configured transport bindings. `AdbTransportId` is the native
-server-local runtime identity: it may be derived from fresh inventory and used for bounded
-runtime pinning, but it is not a durable configuration key. `AdbTransportFeatures` preserves
-the transport's advertised feature names as an open set; it is not a kernel-defined closed
-capability enum. `AdbServerId` is a caller-owned configuration identity under
-`adb.configuration`, not a field of native ADB state. `AdbServerConfiguration` binds one server
-identity to the smart-socket endpoint used by ADB queries, commands, and orchestration.
+native selection key used by configured transport bindings. Serial-selected bindings are
+re-resolved from fresh inventory as current facts change. `AdbTransportId` is the native
+server-local runtime identity: it may be derived from fresh inventory and used when a caller
+explicitly wants exact runtime-transport selection, but it is not a durable configuration key.
+`AdbTransportFeatures` preserves the transport's advertised feature names as an open set; it is
+not a kernel-defined closed capability enum. `AdbServerId` is a caller-owned configuration
+identity under `adb.configuration`, not a field of native ADB state. `AdbServerConfiguration`
+binds one server identity to the smart-socket endpoint used by ADB queries, commands, and
+orchestration.
 
 Android framework/runtime facts are owned by the `android` domain. `AndroidDisplayId` is a
 logical framework display identity. `AndroidPhysicalDisplayId` is the SurfaceFlinger physical

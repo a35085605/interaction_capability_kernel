@@ -137,11 +137,13 @@ AdbTransportPreparationResult
 
 The episode uses one authoritative deadline and one active transport-inventory observation
 generation. It subscribes before its fresh initial inventory read so updates that occur during
-the probe or atomic connect attempt are not lost between separate orchestration phases. A
-non-zero `AdbTrackedDevice.transport_id` is derived from fresh inventory and pins native
-identity for the episode. If that runtime identity disappears or the configured serial resolves
-to another native transport, preparation reports loss or replacement rather than inferring
-continuity.
+the probe or atomic connect attempt are not lost between separate orchestration phases. Each
+snapshot re-resolves the configured serial from fresh inventory. A serial-selected preparation
+therefore follows the current unique row for that serial even when its server-local
+`transport_id` changes between snapshots; a transient absence remains a waiting condition until
+the deadline. Runtime transport IDs remain available for callers that explicitly require exact
+`AdbTransportById` selection. A newer observation generation still terminates the episode
+because it replaces the evidence-stream baseline.
 
 Presence is evidence-driven. A failed atomic `AdbTcpConnect` attempt does not by itself make
 the presence gate fail if fresh inventory evidence later resolves the configured serial. The

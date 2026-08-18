@@ -31,7 +31,6 @@ from adb.transport.orchestration import (
     AdbTransportPreparationStatus,
     AdbTransportPresenceSatisfaction,
 )
-from adb.transport.selection import AdbTransportId
 from adb.transport.signal import (
     AdbTransportCommandCompleted,
     AdbTransportPreparationCompleted,
@@ -148,7 +147,6 @@ class AdbTransportPreparationOrchestrator:
     ) -> AdbTransportPreparationResult:
         attempts: list[NativeAttemptResult] = []
         presence: AdbTransportPresenceSatisfaction | None = None
-        pinned_id: AdbTransportId | None = None
         final_snapshot: AdbDevicesSnapshot | None = None
         final_row: AdbTrackedDevice | None = None
         initial_snapshot_processed = False
@@ -165,11 +163,10 @@ class AdbTransportPreparationOrchestrator:
             outcome = self._evaluate_snapshot(
                 snapshot,
                 policy,
-                pinned_id,
                 presence,
                 initial=True,
             )
-            presence, pinned_id, final_row, terminal = outcome
+            presence, final_row, terminal = outcome
             if terminal is not None:
                 return self._complete(
                     operation,
@@ -180,7 +177,6 @@ class AdbTransportPreparationOrchestrator:
                     presence,
                     final_snapshot,
                     final_row,
-                    pinned_id,
                     diagnostic,
                     already_satisfied=(
                         terminal is AdbTransportPreparationStatus.SATISFIED
@@ -212,7 +208,6 @@ class AdbTransportPreparationOrchestrator:
                     presence,
                     final_snapshot,
                     final_row,
-                    pinned_id,
                     diagnostic,
                 )
 
@@ -232,7 +227,6 @@ class AdbTransportPreparationOrchestrator:
                         presence,
                         final_snapshot,
                         final_row,
-                        pinned_id,
                         "transport inventory observation generation changed",
                     )
 
@@ -246,7 +240,6 @@ class AdbTransportPreparationOrchestrator:
                     presence,
                     final_snapshot,
                     final_row,
-                    pinned_id,
                     event.diagnostic or f"observation failed: {event.failure.value}",
                 )
             if isinstance(event, AdbTransportInventoryObservationStopped):
@@ -259,7 +252,6 @@ class AdbTransportPreparationOrchestrator:
                     presence,
                     final_snapshot,
                     final_row,
-                    pinned_id,
                     "transport inventory observation stopped",
                 )
             if isinstance(event, AdbTransportInventoryObservationStarted):
@@ -271,11 +263,10 @@ class AdbTransportPreparationOrchestrator:
             outcome = self._evaluate_snapshot(
                 event.snapshot,
                 policy,
-                pinned_id,
                 presence,
                 initial=False,
             )
-            presence, pinned_id, final_row, terminal = outcome
+            presence, final_row, terminal = outcome
             initial_snapshot_processed = True
             if terminal is not None:
                 return self._complete(
@@ -287,7 +278,6 @@ class AdbTransportPreparationOrchestrator:
                     presence,
                     final_snapshot,
                     final_row,
-                    pinned_id,
                     diagnostic,
                 )
             if (
@@ -302,60 +292,35 @@ class AdbTransportPreparationOrchestrator:
         self,
         snapshot: AdbDevicesSnapshot,
         policy: AdbTransportPreparationPolicy,
-        pinned_id: AdbTransportId | None,
         presence: AdbTransportPresenceSatisfaction | None,
         *,
         initial: bool,
     ) -> tuple[
         AdbTransportPresenceSatisfaction | None,
-        AdbTransportId | None,
         AdbTrackedDevice | None,
         AdbTransportPreparationStatus | None,
     ]:
         resolution = resolve_transport_binding(self.binding_configuration, snapshot)
 
-        if pinned_id is not None:
-            pinned_matches = tuple(
-                row for row in snapshot.devices if row.transport_id == pinned_id
+        if resolution.status is AdbTransportBindingResolutionStatus.AMBIGUOUS:
+            return presence, None, AdbTransportPreparationStatus.AMBIGUOUS
+        if resolution.status is AdbTransportBindingResolutionStatus.ABSENT:
+            return presence, None, None
+
+        row = resolution.row
+        assert row is not None
+        if presence is None:
+            presence = (
+                AdbTransportPresenceSatisfaction.ALREADY_PRESENT
+                if initial
+                else AdbTransportPresenceSatisfaction.OBSERVED
             )
-            if len(pinned_matches) > 1:
-                return presence, pinned_id, None, AdbTransportPreparationStatus.AMBIGUOUS
-            if not pinned_matches:
-                if resolution.status is AdbTransportBindingResolutionStatus.RESOLVED:
-                    replacement = resolution.row
-                    assert replacement is not None
-                    if replacement.transport_id != pinned_id:
-                        return (
-                            presence,
-                            pinned_id,
-                            replacement,
-                            AdbTransportPreparationStatus.TRANSPORT_REPLACED,
-                        )
-                if resolution.status is AdbTransportBindingResolutionStatus.AMBIGUOUS:
-                    return presence, pinned_id, None, AdbTransportPreparationStatus.AMBIGUOUS
-                return presence, pinned_id, None, AdbTransportPreparationStatus.TRANSPORT_LOST
-            row = pinned_matches[0]
-        else:
-            if resolution.status is AdbTransportBindingResolutionStatus.AMBIGUOUS:
-                return presence, None, None, AdbTransportPreparationStatus.AMBIGUOUS
-            if resolution.status is AdbTransportBindingResolutionStatus.ABSENT:
-                return presence, None, None, None
-            row = resolution.row
-            assert row is not None
-            if presence is None:
-                presence = (
-                    AdbTransportPresenceSatisfaction.ALREADY_PRESENT
-                    if initial
-                    else AdbTransportPresenceSatisfaction.OBSERVED
-                )
-            if isinstance(row.transport_id, AdbTransportId):
-                pinned_id = row.transport_id
 
         if row.state in policy.acceptable_states:
-            return presence, pinned_id, row, AdbTransportPreparationStatus.SATISFIED
+            return presence, row, AdbTransportPreparationStatus.SATISFIED
         if row.state in policy.blocked_states:
-            return presence, pinned_id, row, AdbTransportPreparationStatus.BLOCKED
-        return presence, pinned_id, row, None
+            return presence, row, AdbTransportPreparationStatus.BLOCKED
+        return presence, row, None
 
     def _connect(self) -> NativeAttemptResult:
         address = self.binding_configuration.connect_address
@@ -389,7 +354,6 @@ class AdbTransportPreparationOrchestrator:
         presence: AdbTransportPresenceSatisfaction | None,
         final_snapshot: AdbDevicesSnapshot | None,
         final_row: AdbTrackedDevice | None,
-        pinned_id: AdbTransportId | None,
         diagnostic: str | None,
         *,
         already_satisfied: bool = False,
@@ -411,7 +375,6 @@ class AdbTransportPreparationOrchestrator:
             attempts=tuple(attempts),
             final_snapshot=final_snapshot,
             final_row=final_row,
-            pinned_transport_id=pinned_id,
             diagnostic=diagnostic,
         )
         self._bus.publish(AdbTransportPreparationCompleted(result))
