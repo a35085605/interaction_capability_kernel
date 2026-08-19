@@ -86,7 +86,7 @@ class AdbDevicesObserver:
 
         with self._lock:
             if self._closed:
-                raise RuntimeError("observation observer is closed")
+                raise RuntimeError("ADB devices observer is closed")
             if self._active_thread is not None:
                 raise RuntimeError("an ADB observation session is already active")
             self._generation += 1
