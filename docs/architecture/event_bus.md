@@ -68,7 +68,10 @@ fresh server probe
 `AdbServerSupervisor` owns the durable running intent around those bounded episodes:
 
 ```text
-desired_running + auto_recovery
+desired_running + recovery_enabled
+              │
+              ▼
+        recovery_armed
               │
               ▼
       bounded ensure-available
@@ -82,10 +85,17 @@ desired_running + auto_recovery
           └────────┴──► fresh bounded reconciliation
 ```
 
+`recovery_armed` is derived from `desired_running and recovery_enabled`; it is not a separately
+stored preference. The supervisor requires `recovery_enabled` to be supplied explicitly when a
+running intent is started. Caller-facing defaults such as `auto_recovery=True`, and any preference
+that should survive a stop/start boundary, belong to the managed runtime rather than the
+supervisor.
+
 The server supervisor owns retry/backoff, the recovery gate, recovery-cycle fencing, and
-serialization of managed server start/stop mutations. Disabling automatic recovery does not stop
-the server or change `desired_running`. `stop()` invalidates running recovery and then serializes a
-bounded ensure-unavailable episode after any already-entered managed server mutation.
+serialization of managed server start/stop mutations. Disabling recovery does not stop the server
+or change `desired_running`. `stop()` invalidates running recovery, clears the current
+`recovery_enabled` state, and then serializes a bounded ensure-unavailable episode after any
+already-entered managed server mutation.
 
 The supervisor intentionally does not invent a hidden liveness source. `reconcile()` lets the
 future managed runtime request a fresh server reconciliation when explicit runtime evidence (for
@@ -134,5 +144,6 @@ generation identity and typed observation failure in its returned episode result
 
 `adb.managed.AdbManagedRuntime` and `RegisteredTransport` are currently a public scaffold only;
 their methods deliberately raise `NotImplementedError`. The scaffold marks the future coordination
-boundary where server desired state, observation demand, and registered transport recovery can be
-composed without merging their supervisor ownership.
+boundary where caller-facing recovery defaults, liveness-source-to-reconcile policy, server desired
+state, observation demand, and registered transport recovery can be composed without merging their
+supervisor ownership.
