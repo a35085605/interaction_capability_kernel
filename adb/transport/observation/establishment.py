@@ -19,7 +19,7 @@ from adb.server.lifecycle import (
     AdbServerProbeResult,
 )
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.runner import AdbDevicesObservationController
+from adb.transport.observation.observer import AdbDevicesObservationController
 from adb.transport.observation.signal import (
     AdbDevicesObservationFailed,
     AdbDevicesObservationFailure,
