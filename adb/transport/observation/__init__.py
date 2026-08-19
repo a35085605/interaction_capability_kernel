@@ -14,9 +14,9 @@ from adb.transport.observation.establishment import (
     AdbDevicesObservationEstablishmentResult,
     AdbDevicesObservationEstablishmentStatus,
 )
-from adb.transport.observation.runner import (
+from adb.transport.observation.observer import (
     AdbDevicesObservationController,
-    AdbDevicesObservationRunner,
+    AdbDevicesObserver,
 )
 
 __all__ = [
@@ -31,5 +31,5 @@ __all__ = [
     "AdbDevicesObservationEstablishmentPolicy",
     "AdbDevicesObservationEstablishmentResult",
     "AdbDevicesObservationEstablishmentStatus",
-    "AdbDevicesObservationRunner",
+    "AdbDevicesObserver",
 ]

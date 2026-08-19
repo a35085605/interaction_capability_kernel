@@ -22,7 +22,7 @@ from adb.transport.observation.establishment import (
     AdbDevicesObservationEstablishmentResult,
     AdbDevicesObservationEstablishmentStatus,
 )
-from adb.transport.observation.runner import AdbDevicesObservationController
+from adb.transport.observation.observer import AdbDevicesObservationController
 from adb.transport.observation.signal import (
     AdbDevicesObservationFailed,
     AdbDevicesObservationFailure,
@@ -94,7 +94,7 @@ class AdbDevicesObservationSupervisor:
         self._thread_factory = _thread_factory
         self._lock = Lock()
         self._subscriptions: tuple[EventSubscriptionToken, ...] = ()
-        self._current_session_id = observation.current_session_id
+        self._current_session_id = observation.active_session_id
         self._cycle_id: AdbDevicesObservationEstablishmentCycleId | None = None
         self._retry_token: ScheduleToken | None = None
         self._attempt_thread: Thread | None = None

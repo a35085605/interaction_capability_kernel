@@ -21,7 +21,7 @@ from adb.transport.binding import (
 from adb.transport.devices.domain import AdbDevicesSnapshot
 from adb.transport.devices.query import AdbDevicesSnapshotReader
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.runner import AdbDevicesObservationController
+from adb.transport.observation.observer import AdbDevicesObservationController
 from adb.transport.observation.signal import (
     AdbDevicesObservationStarted,
     AdbDevicesSnapshotObserved,
@@ -187,14 +187,14 @@ class AdbTransportBindingSupervisor:
                 thread.join()
 
     def _project_fresh_snapshot(self, serial: AdbDeviceSerial) -> None:
-        session_id = self._observation.current_session_id
+        session_id = self._observation.active_session_id
         if session_id is None or session_id.endpoint != self.endpoint:
             return
         try:
             snapshot = self._snapshot_reader.read(self.endpoint)
         except AdbError:
             return
-        if self._observation.current_session_id != session_id:
+        if self._observation.active_session_id != session_id:
             return
         self._apply_snapshot(session_id, snapshot, serial=serial)
 

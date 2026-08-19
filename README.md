@@ -215,11 +215,13 @@ manage transport connection state separately.
 `InMemoryEventBus` provides ordered in-process FIFO delivery. Domain signals remain immutable
 payloads owned by their domain; supervisors decide what those signals mean.
 
-`AdbDevicesObservationRunner` establishes `track-devices` stream mode before emitting
+`AdbDevicesObserver` establishes `track-devices` stream mode before emitting
 `AdbDevicesObservationStarted`, emits complete snapshots through
 `AdbDevicesSnapshotObserved`, and attaches an
 `AdbObservationSessionId` containing the ADB server endpoint plus a monotonically increasing
-generation. A new generation establishes a new observation baseline; observation
+generation. Its `active_session_id` identifies only the allocated non-terminal generation and
+is cleared before terminal `AdbDevicesObservationStopped` or `AdbDevicesObservationFailed`
+evidence is published. A new generation establishes a new observation baseline; observation
 termination does not imply that transports disappeared.
 
 `AdbServerEnsureOrchestrator` lives under `adb.server.lifecycle` and provides the concrete

@@ -6,7 +6,7 @@ import unittest
 from adb.server import AdbServerEndpoint
 from adb.transport.devices.domain import AdbDevicesSnapshot
 from adb.transport.observation.contracts import AdbObservationServerConnectionError
-from adb.transport.observation.runner import AdbDevicesObservationRunner
+from adb.transport.observation.observer import AdbDevicesObserver
 from adb.transport.observation.signal import (
     AdbDevicesSnapshotObserved,
     AdbDevicesObservationFailed,
@@ -45,59 +45,70 @@ class _Source(AdbTrackDevicesSource):
         self.source_closed = True
 
 
-class AdbObservationRunnerTests(unittest.TestCase):
+class AdbDevicesObserverTests(unittest.TestCase):
     def _endpoint(self) -> AdbServerEndpoint:
         return AdbServerEndpoint("127.0.0.1", 5037)
 
     def test_started_is_emitted_after_open_before_first_snapshot(self) -> None:
         bus = InMemoryEventBus()
         observed: list[object] = []
+        active_when_started = []
         terminal = Event()
+
+        observer = AdbDevicesObserver(
+            self._endpoint(), bus, _source_factory=lambda endpoint: _Source(endpoint)
+        )
 
         def collect(event: object) -> None:
             observed.append(event)
+            if isinstance(event, AdbDevicesObservationStarted):
+                active_when_started.append(observer.active_session_id)
             if isinstance(event, AdbDevicesObservationStopped):
+                self.assertIsNone(observer.active_session_id)
                 terminal.set()
 
         bus.subscribe(object, collect)
-        runner = AdbDevicesObservationRunner(
-            self._endpoint(), bus, _source_factory=lambda endpoint: _Source(endpoint)
-        )
-        session_id = runner.start()
+        session_id = observer.start()
         self.assertTrue(terminal.wait(2))
         self.assertIsInstance(observed[0], AdbDevicesObservationStarted)
         self.assertIsInstance(observed[1], AdbDevicesSnapshotObserved)
         self.assertIsInstance(observed[2], AdbDevicesObservationStopped)
         self.assertEqual(observed[0].session_id, session_id)
+        self.assertEqual(active_when_started, [session_id])
         self.assertEqual(session_id.endpoint, self._endpoint())
+        self.assertIsNone(observer.active_session_id)
 
     def test_server_connection_failure_is_generation_fenced_and_next_start_increments(self) -> None:
         bus = InMemoryEventBus()
         failures: list[AdbDevicesObservationFailed] = []
         terminal = Event()
-
-        def collect(event: AdbDevicesObservationFailed) -> None:
-            failures.append(event)
-            terminal.set()
-
-        bus.subscribe(AdbDevicesObservationFailed, collect)
         fail_next = [True, False]
 
         def source_factory(endpoint: AdbServerEndpoint) -> _Source:
             return _Source(endpoint, fail=fail_next.pop(0))
 
-        runner = AdbDevicesObservationRunner(
+        observer = AdbDevicesObserver(
             self._endpoint(), bus, _source_factory=source_factory
         )
-        first = runner.start()
+
+        def collect(event: AdbDevicesObservationFailed) -> None:
+            failures.append(event)
+            self.assertIsNone(observer.active_session_id)
+            terminal.set()
+
+        bus.subscribe(AdbDevicesObservationFailed, collect)
+        first = observer.start()
         self.assertTrue(terminal.wait(2))
+        self.assertIsNone(observer.active_session_id)
+
         second_terminal = Event()
         bus.subscribe(AdbDevicesObservationStopped, lambda event: second_terminal.set())
-        second = runner.start()
+        second = observer.start()
         self.assertTrue(second_terminal.wait(2))
         self.assertEqual(first.generation, 1)
         self.assertEqual(second.generation, 2)
         self.assertEqual(failures[0].session_id, first)
+        self.assertIsNone(observer.active_session_id)
 
 
 if __name__ == "__main__":

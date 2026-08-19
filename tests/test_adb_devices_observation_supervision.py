@@ -86,43 +86,48 @@ class _Observation:
         self.bus = bus
         self.outcomes = outcomes
         self.generation = 0
-        self.current_session_id = None
+        self.active_session_id = None
         self.closed = False
         self.stop_calls = 0
 
     def start(self) -> AdbObservationSessionId:
         self.generation += 1
-        self.current_session_id = AdbObservationSessionId(self.endpoint, self.generation)
+        session_id = AdbObservationSessionId(self.endpoint, self.generation)
+        self.active_session_id = session_id
         outcome = self.outcomes.pop(0)
         if outcome == "started":
-            self.bus.publish(AdbDevicesObservationStarted(self.endpoint, self.current_session_id))
+            self.bus.publish(AdbDevicesObservationStarted(self.endpoint, session_id))
         elif outcome == "connection_failed":
+            self.active_session_id = None
             self.bus.publish(
                 AdbDevicesObservationFailed(
                     self.endpoint,
-                    self.current_session_id,
+                    session_id,
                     AdbDevicesObservationFailure.SERVER_CONNECTION,
                     "connection failed",
                 )
             )
         elif outcome == "protocol_failed":
+            self.active_session_id = None
             self.bus.publish(
                 AdbDevicesObservationFailed(
                     self.endpoint,
-                    self.current_session_id,
+                    session_id,
                     AdbDevicesObservationFailure.PROTOCOL,
                     "protocol failed",
                 )
             )
         else:
             raise AssertionError(f"unsupported observation outcome: {outcome}")
-        return self.current_session_id
+        return session_id
 
     def stop(self) -> None:
         self.stop_calls += 1
+        self.active_session_id = None
 
     def close(self) -> None:
         self.closed = True
+        self.active_session_id = None
 
 
 class _Scheduler:
@@ -257,6 +262,7 @@ class AdbDevicesObservationEstablishmentTests(unittest.TestCase):
         )
         self.assertIs(result.status, AdbDevicesObservationEstablishmentStatus.FAILED)
         self.assertIs(result.observation_failure, AdbDevicesObservationFailure.SERVER_CONNECTION)
+        self.assertIsNone(observation.active_session_id)
 
 
 class AdbDevicesObservationSupervisorTests(unittest.TestCase):
@@ -298,6 +304,7 @@ class AdbDevicesObservationSupervisorTests(unittest.TestCase):
         commands = _ServerCommands(_attempt())
         bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started", "started"])
         first = supervisor.start()
+        observation.active_session_id = None
         bus.publish(
             AdbDevicesObservationFailed(
                 _endpoint(), first, AdbDevicesObservationFailure.SERVER_CONNECTION, "socket lost"
@@ -338,6 +345,7 @@ class AdbDevicesObservationSupervisorTests(unittest.TestCase):
         bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started"])
         first = supervisor.start()
         calls_after_initialization = reader.calls
+        observation.active_session_id = None
         bus.publish(
             AdbDevicesObservationFailed(
                 _endpoint(), first, AdbDevicesObservationFailure.PROTOCOL

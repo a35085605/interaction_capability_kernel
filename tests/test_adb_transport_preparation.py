@@ -66,7 +66,7 @@ class _Observation:
         self._session_id = session_id
 
     @property
-    def current_session_id(self) -> AdbObservationSessionId | None:
+    def active_session_id(self) -> AdbObservationSessionId | None:
         return self._session_id
 
     def start(self) -> AdbObservationSessionId:

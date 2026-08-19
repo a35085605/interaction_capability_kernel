@@ -40,7 +40,7 @@ from adb.transport.observation import (
     AdbObservationServiceError,
     AdbObservationSessionId,
     AdbDevicesObservationController,
-    AdbDevicesObservationRunner,
+    AdbDevicesObserver,
 )
 
 __all__ = [
@@ -68,7 +68,7 @@ __all__ = [
     "AdbTransportPresenceSatisfaction",
     "AdbTransportRecovery",
     "AdbDevicesObservationController",
-    "AdbDevicesObservationRunner",
+    "AdbDevicesObserver",
     "AdbTransportById",
     "AdbTransportBySerial",
     "AdbTransportFeatures",

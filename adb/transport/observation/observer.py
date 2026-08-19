@@ -39,7 +39,7 @@ def _default_thread_factory(*args, **kwargs) -> Thread:
 @runtime_checkable
 class AdbDevicesObservationController(Protocol):
     @property
-    def current_session_id(self) -> AdbObservationSessionId | None: ...
+    def active_session_id(self) -> AdbObservationSessionId | None: ...
 
     def start(self) -> AdbObservationSessionId: ...
 
@@ -48,8 +48,8 @@ class AdbDevicesObservationController(Protocol):
     def close(self) -> None: ...
 
 
-class AdbDevicesObservationRunner:
-    """Produce lifecycle signals for generation-fenced transport-inventory sessions."""
+class AdbDevicesObserver:
+    """Observe generation-fenced transport inventory and publish lifecycle signals."""
 
     def __init__(
         self,
@@ -69,22 +69,24 @@ class AdbDevicesObservationRunner:
         self._thread_factory = _thread_factory
         self._lock = Lock()
         self._generation = 0
-        self._current_session_id: AdbObservationSessionId | None = None
+        self._active_session_id: AdbObservationSessionId | None = None
         self._active_source: AdbTrackDevicesSource | None = None
         self._active_thread: Thread | None = None
         self._closed = False
 
     @property
-    def current_session_id(self) -> AdbObservationSessionId | None:
+    def active_session_id(self) -> AdbObservationSessionId | None:
+        """Return the allocated non-terminal observation generation, if any."""
+
         with self._lock:
-            return self._current_session_id
+            return self._active_session_id
 
     def start(self) -> AdbObservationSessionId:
-        """Start one new observation generation in a background thread."""
+        """Allocate and start one new observation generation in a background thread."""
 
         with self._lock:
             if self._closed:
-                raise RuntimeError("observation runner is closed")
+                raise RuntimeError("ADB devices observer is closed")
             if self._active_thread is not None:
                 raise RuntimeError("an ADB observation session is already active")
             self._generation += 1
@@ -103,14 +105,14 @@ class AdbDevicesObservationRunner:
                     f"{self.endpoint.host}-{self.endpoint.port}-{session_id.generation}"
                 ),
             )
-            self._current_session_id = session_id
+            self._active_session_id = session_id
             self._active_source = source
             self._active_thread = thread
             thread.start()
             return session_id
 
     def stop(self) -> None:
-        """Stop the active session without closing the runner for future generations."""
+        """Stop the active session without closing the observer for future generations."""
 
         with self._lock:
             source = self._active_source
@@ -185,12 +187,13 @@ class AdbDevicesObservationRunner:
         source: AdbTrackDevicesSource,
     ) -> None:
         with self._lock:
-            if self._current_session_id == session_id and self._active_source is source:
+            if self._active_session_id == session_id and self._active_source is source:
+                self._active_session_id = None
                 self._active_source = None
                 self._active_thread = None
 
 
 __all__ = [
     "AdbDevicesObservationController",
-    "AdbDevicesObservationRunner",
+    "AdbDevicesObserver",
 ]

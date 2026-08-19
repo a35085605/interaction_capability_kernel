@@ -16,7 +16,7 @@ from adb.transport.connection import AdbTcpConnect, AdbTcpConnector
 from adb.transport.devices.domain import AdbDevicesSnapshot, AdbTrackedDevice
 from adb.transport.devices.query import AdbDevicesSnapshotReader
 from adb.transport.observation.contracts import AdbObservationSessionId
-from adb.transport.observation.runner import AdbDevicesObservationController
+from adb.transport.observation.observer import AdbDevicesObservationController
 from adb.transport.observation.signal import (
     AdbDevicesObservationFailed,
     AdbDevicesObservationStarted,
@@ -99,7 +99,7 @@ class AdbTransportPreparationOrchestrator:
         if operation.serial != self.binding_configuration.serial:
             raise ValueError("operation serial does not match configured ADB transport")
 
-        session_id = self._observation.current_session_id
+        session_id = self._observation.active_session_id
         if session_id is None:
             raise RuntimeError("transport preparation requires an active observation session")
         if session_id.endpoint != operation.endpoint:
