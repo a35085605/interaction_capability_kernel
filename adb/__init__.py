@@ -17,6 +17,7 @@ from adb.errors import (
     AdbTransportSelectionError,
     AdbTransportUnavailableError,
 )
+from adb.managed import AdbManagedRuntime, RegisteredTransport
 from adb.server import AdbServerStatusReader
 from adb.transport import (
     AdbConnectionState,
@@ -41,6 +42,7 @@ __all__ = [
     "AdbDevicesSnapshot",
     "AdbDevicesSnapshotReader",
     "AdbError",
+    "AdbManagedRuntime",
     "AdbProtocolError",
     "AdbRemoteCommandError",
     "AdbServerConnectionError",
@@ -59,4 +61,5 @@ __all__ = [
     "AdbTransportSelectionError",
     "AdbTransportSelector",
     "AdbTransportUnavailableError",
+    "RegisteredTransport",
 ]
