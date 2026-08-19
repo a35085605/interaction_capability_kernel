@@ -71,7 +71,7 @@ fresh server probe
 desired_running + recovery_enabled
               │
               ▼
-        recovery_armed
+   internal recovery gate
               │
               ▼
       bounded ensure-available
@@ -85,11 +85,11 @@ desired_running + recovery_enabled
           └────────┴──► fresh bounded reconciliation
 ```
 
-`recovery_armed` is derived from `desired_running and recovery_enabled`; it is not a separately
-stored preference. The supervisor requires `recovery_enabled` to be supplied explicitly when a
-running intent is started. Caller-facing defaults such as `auto_recovery=True`, and any preference
-that should survive a stop/start boundary, belong to the managed runtime rather than the
-supervisor.
+The internal recovery gate is derived from `desired_running and recovery_enabled`; it is not a
+separately stored preference or a public supervisor property. The supervisor requires
+`recovery_enabled` to be supplied explicitly when a running intent is started. Caller-facing
+defaults such as `auto_recovery=True`, and any preference that should survive a stop/start boundary,
+belong to the managed runtime rather than the supervisor.
 
 The server supervisor owns retry/backoff, the recovery gate, recovery-cycle fencing, and
 serialization of managed server start/stop mutations. Disabling recovery does not stop the server
