@@ -149,52 +149,70 @@ class AdbServerSupervisorTests(unittest.TestCase):
         )
         return bus, commands, scheduler, supervisor
 
+    def test_start_requires_explicit_recovery_policy(self) -> None:
+        reader = _StatusReader([AdbServerStatus()])
+        _, _, _, supervisor = self._supervisor(reader)
+        with self.assertRaises(TypeError):
+            supervisor.start()  # type: ignore[call-arg]
+
     def test_start_establishes_running_condition(self) -> None:
         reader = _StatusReader([
             AdbServerConnectionError("down"),
             AdbServerStatus(),
         ])
         _, commands, scheduler, supervisor = self._supervisor(reader)
-        result = supervisor.start(auto_recovery=True)
+        result = supervisor.start(recovery_enabled=True)
         self.assertIs(result.status, AdbServerEnsureStatus.SATISFIED)
         self.assertTrue(supervisor.desired_running)
-        self.assertTrue(supervisor.auto_recovery)
+        self.assertTrue(supervisor.recovery_enabled)
+        self.assertTrue(supervisor.recovery_armed)
         self.assertEqual(len(commands.started), 1)
         self.assertEqual(scheduler.scheduled, [])
 
     def test_disable_recovery_cancels_retry_without_stopping_server(self) -> None:
         reader = _StatusReader([AdbServerConnectionError("down")], repeat_last=True)
         _, commands, scheduler, supervisor = self._supervisor(reader)
-        result = supervisor.start(auto_recovery=True)
+        result = supervisor.start(recovery_enabled=True)
         self.assertIs(result.status, AdbServerEnsureStatus.TIMED_OUT)
         self.assertEqual(len(scheduler.scheduled), 1)
         _, retry_event, token = scheduler.scheduled[0]
         self.assertIsInstance(retry_event, AdbServerRecoveryRetryDue)
         epoch = supervisor.recovery_epoch
-        supervisor.set_auto_recovery(False)
+        supervisor.set_recovery_enabled(False)
         self.assertGreater(supervisor.recovery_epoch, epoch)
         self.assertIn(token, scheduler.cancelled)
         self.assertTrue(supervisor.desired_running)
-        self.assertFalse(supervisor.auto_recovery)
+        self.assertFalse(supervisor.recovery_enabled)
+        self.assertFalse(supervisor.recovery_armed)
         self.assertEqual(commands.stopped, [])
 
     def test_reenable_recovery_reconciles_immediately(self) -> None:
         reader = _StatusReader([AdbServerConnectionError("down")], repeat_last=True)
         _, _, scheduler, supervisor = self._supervisor(reader)
-        supervisor.start(auto_recovery=False)
+        supervisor.start(recovery_enabled=False)
         self.assertEqual(scheduler.scheduled, [])
         calls_before_enable = reader.calls
-        supervisor.set_auto_recovery(True)
+        supervisor.set_recovery_enabled(True)
         _wait_until(lambda: reader.calls > calls_before_enable)
-        self.assertTrue(supervisor.auto_recovery)
+        self.assertTrue(supervisor.recovery_enabled)
+        self.assertTrue(supervisor.recovery_armed)
         self.assertEqual(len(scheduler.scheduled), 1)
+
+    def test_enable_recovery_without_running_intent_is_rejected(self) -> None:
+        reader = _StatusReader([AdbServerStatus()])
+        _, _, _, supervisor = self._supervisor(reader)
+        with self.assertRaises(RuntimeError):
+            supervisor.set_recovery_enabled(True)
+        self.assertFalse(supervisor.desired_running)
+        self.assertFalse(supervisor.recovery_enabled)
+        self.assertFalse(supervisor.recovery_armed)
 
     def test_recovery_cycle_exhaustion_is_server_owned(self) -> None:
         reader = _StatusReader([AdbServerConnectionError("down")], repeat_last=True)
         bus, _, scheduler, supervisor = self._supervisor(reader, max_attempts=2)
         exhausted: list[AdbServerRecoveryExhausted] = []
         bus.subscribe(AdbServerRecoveryExhausted, exhausted.append)
-        supervisor.start(auto_recovery=True)
+        supervisor.start(recovery_enabled=True)
         _, retry_event, _ = scheduler.scheduled[0]
         bus.publish(retry_event)
         _wait_until(lambda: len(exhausted) == 1)
@@ -209,19 +227,23 @@ class AdbServerSupervisorTests(unittest.TestCase):
             AdbServerConnectionError("stopped"),
         ])
         _, commands, _, supervisor = self._supervisor(reader)
-        supervisor.start(auto_recovery=True)
+        supervisor.start(recovery_enabled=True)
         epoch = supervisor.recovery_epoch
         result = supervisor.stop()
         self.assertIs(result.status, AdbServerEnsureStatus.SATISFIED)
         self.assertFalse(supervisor.desired_running)
+        self.assertFalse(supervisor.recovery_enabled)
+        self.assertFalse(supervisor.recovery_armed)
         self.assertGreater(supervisor.recovery_epoch, epoch)
         self.assertEqual(len(commands.stopped), 1)
 
     def test_close_does_not_stop_native_server(self) -> None:
         reader = _StatusReader([AdbServerStatus()])
         _, commands, _, supervisor = self._supervisor(reader)
-        supervisor.start(auto_recovery=True)
+        supervisor.start(recovery_enabled=True)
         supervisor.close()
+        self.assertFalse(supervisor.recovery_enabled)
+        self.assertFalse(supervisor.recovery_armed)
         self.assertEqual(commands.stopped, [])
 
 
