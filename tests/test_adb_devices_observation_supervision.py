@@ -224,58 +224,47 @@ class AdbServerEnsureOrchestratorTests(unittest.TestCase):
 
 
 class AdbDevicesObservationEstablishmentTests(unittest.TestCase):
-    def test_establishment_requires_started_evidence_after_server_ensure(self) -> None:
+    def test_establishment_requires_started_evidence_without_server_mutation(self) -> None:
         bus = InMemoryEventBus()
-        reader = _StatusReader([
-            AdbServerConnectionError("down"),
-            AdbServerConnectionError("down"),
-            AdbServerStatus(),
-        ])
-        commands = _ServerCommands(_attempt())
         observation = _Observation(_endpoint(), bus, ["started"])
-        ensure = AdbServerEnsureOrchestrator(_endpoint(), reader, commands, commands, bus)
-        establishment = AdbDevicesObservationEstablishmentOrchestrator(_endpoint(), bus, observation, ensure)
+        establishment = AdbDevicesObservationEstablishmentOrchestrator(
+            _endpoint(), bus, observation
+        )
         result = establishment.establish(
             AdbDevicesObservationEstablishment(
                 _endpoint(),
-                AdbDevicesObservationEstablishmentPolicy(2.0, AdbServerEnsurePolicy(1.0, 0.1)),
+                AdbDevicesObservationEstablishmentPolicy(2.0),
             )
         )
         self.assertIs(result.status, AdbDevicesObservationEstablishmentStatus.SATISFIED)
         self.assertEqual(result.observation_session_id.generation, 1)
         self.assertEqual(result.observation_session_id.endpoint, _endpoint())
-        self.assertEqual(len(result.attempts), 1)
-        self.assertEqual(len(commands.started), 1)
+        self.assertEqual(result.attempts, ())
 
     def test_failed_start_generation_is_not_reported_as_established(self) -> None:
         bus = InMemoryEventBus()
-        reader = _StatusReader([AdbServerStatus()])
-        commands = _ServerCommands(_attempt())
         observation = _Observation(_endpoint(), bus, ["connection_failed"])
-        ensure = AdbServerEnsureOrchestrator(_endpoint(), reader, commands, commands, bus)
-        establishment = AdbDevicesObservationEstablishmentOrchestrator(_endpoint(), bus, observation, ensure)
+        establishment = AdbDevicesObservationEstablishmentOrchestrator(
+            _endpoint(), bus, observation
+        )
         result = establishment.establish(
             AdbDevicesObservationEstablishment(
                 _endpoint(),
-                AdbDevicesObservationEstablishmentPolicy(2.0, AdbServerEnsurePolicy(1.0, 0.1)),
+                AdbDevicesObservationEstablishmentPolicy(2.0),
             )
         )
         self.assertIs(result.status, AdbDevicesObservationEstablishmentStatus.FAILED)
         self.assertIs(result.observation_failure, AdbDevicesObservationFailure.SERVER_CONNECTION)
         self.assertIsNone(observation.active_session_id)
+        self.assertEqual(result.attempts, ())
 
 
 class AdbDevicesObservationSupervisorTests(unittest.TestCase):
-    def _supervisor(self, reader: _StatusReader, commands: _ServerCommands, outcomes: list[str], *, max_attempts: int | None = None):
+    def _supervisor(self, outcomes: list[str], *, max_attempts: int | None = None):
         bus = InMemoryEventBus()
         observation = _Observation(_endpoint(), bus, outcomes)
         scheduler = _Scheduler()
-        clock = _Clock()
-        ensure = AdbServerEnsureOrchestrator(
-            _endpoint(), reader, commands, commands, bus, _monotonic=clock.monotonic, _sleep=clock.sleep
-        )
         policy = AdbDevicesObservationSupervisionPolicy(
-            ensure_policy=AdbServerEnsurePolicy(0.2, 0.1),
             episode_timeout_seconds=1.0,
             retry_initial_seconds=1,
             retry_max_seconds=8,
@@ -284,25 +273,20 @@ class AdbDevicesObservationSupervisorTests(unittest.TestCase):
             max_attempts=max_attempts,
         )
         supervisor = AdbDevicesObservationSupervisor(
-            _endpoint(), bus, observation, ensure, scheduler, policy, _random=lambda: 0.5
+            _endpoint(), bus, observation, scheduler, policy, _random=lambda: 0.5
         )
         return bus, observation, scheduler, supervisor
 
     def test_start_initializes_observation_through_establishment_episode(self) -> None:
-        reader = _StatusReader([AdbServerStatus()])
-        commands = _ServerCommands(_attempt())
-        bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started"])
+        bus, observation, scheduler, supervisor = self._supervisor(["started"])
         first = supervisor.start()
         self.assertEqual(first.generation, 1)
         self.assertEqual(first.endpoint, _endpoint())
         self.assertEqual(observation.generation, 1)
-        self.assertEqual(commands.started, [])
         self.assertEqual(scheduler.scheduled, [])
 
     def test_runtime_server_connection_failure_establishes_new_generation(self) -> None:
-        reader = _StatusReader([AdbServerStatus()], repeat_last=True)
-        commands = _ServerCommands(_attempt())
-        bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started", "started"])
+        bus, observation, scheduler, supervisor = self._supervisor(["started", "started"])
         first = supervisor.start()
         observation.active_session_id = None
         bus.publish(
@@ -311,14 +295,11 @@ class AdbDevicesObservationSupervisorTests(unittest.TestCase):
             )
         )
         _wait_until(lambda: observation.generation == 2)
-        self.assertEqual(commands.started, [])
         self.assertEqual(scheduler.scheduled, [])
 
     def test_establishment_failures_keep_one_cycle_and_exhaust_budget(self) -> None:
-        reader = _StatusReader([AdbServerStatus()], repeat_last=True)
-        commands = _ServerCommands(_attempt())
         bus, observation, scheduler, supervisor = self._supervisor(
-            reader, commands, ["connection_failed", "connection_failed"], max_attempts=2
+            ["connection_failed", "connection_failed"], max_attempts=2
         )
         exhausted: list[AdbDevicesObservationEstablishmentExhausted] = []
         bus.subscribe(AdbDevicesObservationEstablishmentExhausted, exhausted.append)
@@ -340,11 +321,8 @@ class AdbDevicesObservationSupervisorTests(unittest.TestCase):
         self.assertEqual(len(scheduler.scheduled), 1)
 
     def test_non_server_connection_failure_does_not_trigger_reestablishment(self) -> None:
-        reader = _StatusReader([AdbServerStatus()])
-        commands = _ServerCommands(_attempt())
-        bus, observation, scheduler, supervisor = self._supervisor(reader, commands, ["started"])
+        bus, observation, scheduler, supervisor = self._supervisor(["started"])
         first = supervisor.start()
-        calls_after_initialization = reader.calls
         observation.active_session_id = None
         bus.publish(
             AdbDevicesObservationFailed(
@@ -352,8 +330,6 @@ class AdbDevicesObservationSupervisorTests(unittest.TestCase):
             )
         )
         self.assertEqual(observation.generation, 1)
-        self.assertEqual(reader.calls, calls_after_initialization)
-        self.assertEqual(commands.started, [])
         self.assertEqual(scheduler.scheduled, [])
 
 

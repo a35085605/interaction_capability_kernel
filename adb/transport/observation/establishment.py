@@ -10,14 +10,6 @@ from threading import Condition
 from time import monotonic
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.server.lifecycle import (
-    AdbServerAvailability,
-    AdbServerEnsureAvailable,
-    AdbServerEnsurePolicy,
-    AdbServerEnsureResult,
-    AdbServerEnsureStatus,
-    AdbServerProbeResult,
-)
 from adb.transport.observation.contracts import AdbObservationSessionId
 from adb.transport.observation.observer import AdbDevicesObservationController
 from adb.transport.observation.signal import (
@@ -63,10 +55,9 @@ class AdbDevicesObservationEstablishmentStatus(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class AdbDevicesObservationEstablishmentPolicy:
-    """Bound one observation-establishment episode with explicit server-ensure policy."""
+    """Bound one transport-inventory observation establishment episode."""
 
     timeout_seconds: float
-    ensure_policy: AdbServerEnsurePolicy
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -77,8 +68,6 @@ class AdbDevicesObservationEstablishmentPolicy:
                 field_name="ADB transport-inventory observation establishment timeout",
             ),
         )
-        if not isinstance(self.ensure_policy, AdbServerEnsurePolicy):
-            raise TypeError("ensure_policy must be AdbServerEnsurePolicy")
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,8 +95,6 @@ class AdbDevicesObservationEstablishmentResult:
 
     operation: AdbDevicesObservationEstablishment
     status: AdbDevicesObservationEstablishmentStatus
-    initial_probe: AdbServerProbeResult
-    ensure_result: AdbServerEnsureResult | None = None
     observation_session_id: AdbObservationSessionId | None = None
     observation_failure: AdbDevicesObservationFailure | None = None
     diagnostic: str | None = None
@@ -127,14 +114,6 @@ class AdbDevicesObservationEstablishmentResult:
             raise TypeError(
                 "status must be AdbDevicesObservationEstablishmentStatus"
             )
-        if not isinstance(self.initial_probe, AdbServerProbeResult):
-            raise TypeError("initial_probe must be AdbServerProbeResult")
-        if self.initial_probe.endpoint != self.operation.endpoint:
-            raise ValueError("initial probe endpoint must match establishment operation")
-        if self.ensure_result is not None and not isinstance(
-            self.ensure_result, AdbServerEnsureResult
-        ):
-            raise TypeError("ensure_result must be AdbServerEnsureResult or None")
         if self.observation_session_id is not None:
             if not isinstance(self.observation_session_id, AdbObservationSessionId):
                 raise TypeError("observation_session_id must be AdbObservationSessionId or None")
@@ -149,10 +128,7 @@ class AdbDevicesObservationEstablishmentResult:
             raise TypeError(
                 "observation_failure must be AdbDevicesObservationFailure or None"
             )
-        if (
-            self.status
-            is AdbDevicesObservationEstablishmentStatus.SATISFIED
-        ):
+        if self.status is AdbDevicesObservationEstablishmentStatus.SATISFIED:
             if self.observation_session_id is None:
                 raise ValueError(
                     "satisfied establishment result requires observation_session_id"
@@ -172,24 +148,17 @@ class AdbDevicesObservationEstablishmentResult:
 
     @property
     def attempts(self) -> tuple[NativeAttemptResult, ...]:
-        return self.ensure_result.attempts if self.ensure_result is not None else ()
+        """Observation establishment performs no native server mutation attempts."""
 
-    @property
-    def final_probe(self) -> AdbServerProbeResult:
-        return (
-            self.ensure_result.final_probe
-            if self.ensure_result is not None
-            else self.initial_probe
-        )
+        return ()
 
 
 class AdbDevicesObservationEstablishmentOrchestrator:
     """Establish one track-devices observation generation inside a bounded episode.
 
-    The episode owns no retry/backoff state. Satisfaction requires matching
-    ``AdbDevicesObservationStarted`` evidence, not merely acceptance of
-    ``observation.start()``. Server ensure is a sub-step only when the configured server is
-    freshly observed as unavailable.
+    The episode owns no retry/backoff or server-lifecycle policy. Satisfaction requires matching
+    ``AdbDevicesObservationStarted`` evidence, not merely acceptance of ``observation.start()``.
+    Server condition maintenance belongs to ``AdbServerSupervisor``.
     """
 
     def __init__(
@@ -197,7 +166,6 @@ class AdbDevicesObservationEstablishmentOrchestrator:
         endpoint: AdbServerEndpoint,
         event_bus: EventBus,
         observation: AdbDevicesObservationController,
-        ensure_orchestrator: object,
         *,
         _monotonic: _MonotonicClock = monotonic,
     ) -> None:
@@ -209,14 +177,9 @@ class AdbDevicesObservationEstablishmentOrchestrator:
             raise TypeError("event_bus must satisfy EventBus")
         if not isinstance(observation, AdbDevicesObservationController):
             raise TypeError("observation must satisfy observation controller")
-        if not callable(getattr(ensure_orchestrator, "probe", None)) or not callable(
-            getattr(ensure_orchestrator, "ensure", None)
-        ):
-            raise TypeError("ensure_orchestrator must provide probe() and ensure()")
         self.endpoint = endpoint
         self._bus = event_bus
         self._observation = observation
-        self._ensure = ensure_orchestrator
         self._monotonic = _monotonic
 
     def establish(
@@ -256,57 +219,10 @@ class AdbDevicesObservationEstablishmentOrchestrator:
         condition: Condition,
         events: deque[object],
     ) -> AdbDevicesObservationEstablishmentResult:
-        initial_probe = self._ensure.probe()
-        ensure_result: AdbServerEnsureResult | None = None
-
-        if initial_probe.availability is AdbServerAvailability.INDETERMINATE:
-            return self._complete(
-                operation,
-                AdbDevicesObservationEstablishmentStatus.FAILED,
-                initial_probe,
-                diagnostic=initial_probe.diagnostic or "ADB server availability is indeterminate",
-            )
-
-        if initial_probe.availability is AdbServerAvailability.UNAVAILABLE:
-            remaining = deadline - self._monotonic()
-            if remaining <= 0.0:
-                return self._complete(
-                    operation,
-                    AdbDevicesObservationEstablishmentStatus.TIMED_OUT,
-                    initial_probe,
-                    diagnostic="establishment deadline expired before server ensure",
-                )
-            requested = operation.policy.ensure_policy
-            bounded_policy = AdbServerEnsurePolicy(
-                min(requested.timeout_seconds, remaining),
-                requested.probe_interval_seconds,
-            )
-            ensure_result = self._ensure.ensure(
-                AdbServerEnsureAvailable(operation.endpoint, bounded_policy)
-            )
-            if ensure_result.status is not AdbServerEnsureStatus.SATISFIED:
-                status = (
-                    AdbDevicesObservationEstablishmentStatus.TIMED_OUT
-                    if ensure_result.status is AdbServerEnsureStatus.TIMED_OUT
-                    else AdbDevicesObservationEstablishmentStatus.FAILED
-                )
-                return self._complete(
-                    operation,
-                    status,
-                    initial_probe,
-                    ensure_result=ensure_result,
-                    diagnostic=(
-                        ensure_result.final_probe.diagnostic
-                        or "ADB server could not be established as available"
-                    ),
-                )
-
         if deadline - self._monotonic() <= 0.0:
             return self._complete(
                 operation,
                 AdbDevicesObservationEstablishmentStatus.TIMED_OUT,
-                initial_probe,
-                ensure_result=ensure_result,
                 diagnostic="establishment deadline expired before observation start",
             )
 
@@ -316,8 +232,6 @@ class AdbDevicesObservationEstablishmentOrchestrator:
             return self._complete(
                 operation,
                 AdbDevicesObservationEstablishmentStatus.FAILED,
-                initial_probe,
-                ensure_result=ensure_result,
                 diagnostic=str(exc),
             )
         if session_id.endpoint != operation.endpoint:
@@ -329,8 +243,6 @@ class AdbDevicesObservationEstablishmentOrchestrator:
                 return self._complete(
                     operation,
                     AdbDevicesObservationEstablishmentStatus.TIMED_OUT,
-                    initial_probe,
-                    ensure_result=ensure_result,
                     observation_session_id=session_id,
                     diagnostic="timed out waiting for observation establishment evidence",
                 )
@@ -342,16 +254,12 @@ class AdbDevicesObservationEstablishmentOrchestrator:
                 return self._complete(
                     operation,
                     AdbDevicesObservationEstablishmentStatus.SATISFIED,
-                    initial_probe,
-                    ensure_result=ensure_result,
                     observation_session_id=session_id,
                 )
             if isinstance(event, AdbDevicesObservationFailed):
                 return self._complete(
                     operation,
                     AdbDevicesObservationEstablishmentStatus.FAILED,
-                    initial_probe,
-                    ensure_result=ensure_result,
                     observation_session_id=session_id,
                     observation_failure=event.failure,
                     diagnostic=(
@@ -362,8 +270,6 @@ class AdbDevicesObservationEstablishmentOrchestrator:
                 return self._complete(
                     operation,
                     AdbDevicesObservationEstablishmentStatus.FAILED,
-                    initial_probe,
-                    ensure_result=ensure_result,
                     observation_session_id=session_id,
                     diagnostic="observation stopped before establishment",
                 )
@@ -396,9 +302,7 @@ class AdbDevicesObservationEstablishmentOrchestrator:
     def _complete(
         operation: AdbDevicesObservationEstablishment,
         status: AdbDevicesObservationEstablishmentStatus,
-        initial_probe: AdbServerProbeResult,
         *,
-        ensure_result: AdbServerEnsureResult | None = None,
         observation_session_id: AdbObservationSessionId | None = None,
         observation_failure: AdbDevicesObservationFailure | None = None,
         diagnostic: str | None = None,
@@ -406,8 +310,6 @@ class AdbDevicesObservationEstablishmentOrchestrator:
         return AdbDevicesObservationEstablishmentResult(
             operation=operation,
             status=status,
-            initial_probe=initial_probe,
-            ensure_result=ensure_result,
             observation_session_id=observation_session_id,
             observation_failure=observation_failure,
             diagnostic=diagnostic,

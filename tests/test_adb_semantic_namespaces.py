@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from adb import AdbManagedRuntime, RegisteredTransport
 from adb.server import AdbServerStatusReader as PublicServerStatusReader
 from adb.server.lifecycle import AdbServerEnsurePolicy, AdbServerStart
 from adb.server.lifecycle.adapters import SubprocessAdbServer
@@ -14,6 +15,8 @@ from adb.server.status import AdbServerStatus, AdbServerStatusReader
 from adb.supervision import (
     AdbDevicesObservationSupervisionPolicy,
     AdbDevicesObservationSupervisor,
+    AdbServerSupervisionPolicy,
+    AdbServerSupervisor,
 )
 from adb.transport.connection import AdbTcpConnect
 from adb.transport.connection.adapters import SubprocessAdbTransport
@@ -39,6 +42,16 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
             "adb.server.provisioning",
         )
 
+    def test_server_supervision_namespace_is_canonical(self) -> None:
+        self.assertEqual(
+            AdbServerSupervisionPolicy.__module__,
+            "adb.supervision.model",
+        )
+        self.assertEqual(
+            AdbServerSupervisor.__module__,
+            "adb.supervision.server",
+        )
+
     def test_transport_connection_namespace_is_canonical(self) -> None:
         self.assertEqual(AdbTcpConnect.__module__, "adb.transport.connection.command")
         self.assertEqual(SubprocessAdbTransport.__module__, "adb.transport.connection.adapters")
@@ -57,6 +70,10 @@ class AdbSemanticNamespaceTests(unittest.TestCase):
             AdbDevicesObservationSupervisor.__module__,
             "adb.supervision.devices_observation",
         )
+
+    def test_managed_runtime_scaffold_is_top_level_adb_api(self) -> None:
+        self.assertEqual(AdbManagedRuntime.__module__, "adb.managed")
+        self.assertEqual(RegisteredTransport.__module__, "adb.managed")
 
 
 if __name__ == "__main__":

@@ -64,8 +64,8 @@ The repository provides reusable contracts and data models for:
 - platform-neutral pointer, keyboard, text, navigation, and touch execution contracts;
 - atomic Windows desktop-global and Window inspectors plus Window atomic commands;
 - AOSP-aligned ADB server status, transport-inventory snapshots, selected-transport features,
-  server/pairing/transport atomic commands, domain-local orchestration, and event-driven
-  transport-inventory observation supervision;
+  server/pairing/transport atomic commands, domain-local orchestration, long-lived server
+  condition supervision, and event-driven transport-inventory observation supervision;
 - Android build, boot, current-user/profile, package/activity, WindowManager geometry/insets,
   and logical/physical-display facts reached through ADB;
 - Android-native activity-launch and package-force-stop atomic commands;
@@ -129,7 +129,7 @@ from adb.server.lifecycle import (
     AdbServerEnsurePolicy,
     AdbServerEnsureResult,
 )
-from adb.supervision import AdbDevicesObservationSupervisor
+from adb.supervision import AdbDevicesObservationSupervisor, AdbServerSupervisor
 from adb.transport.binding import AdbTransportBindingConfiguration
 from adb.transport.orchestration import (
     AdbTransportPreparation,
@@ -213,11 +213,18 @@ satisfied.
 Pairing establishes the host-device wireless-debugging trust relationship; transport commands
 manage transport connection state separately.
 
-## Event delivery and ADB transport-inventory observation supervision
+## Event delivery and ADB server / observation supervision
 
 `eventing` owns publication/subscription infrastructure, not domain behavior.
 `InMemoryEventBus` provides ordered in-process FIFO delivery. Domain signals remain immutable
 payloads owned by their domain; supervisors decide what those signals mean.
+
+ADB server availability and transport-inventory observation are supervised as separate long-lived
+conditions. `AdbServerEnsureOrchestrator` remains the bounded probe / one atomic server command /
+fresh verification executor. `AdbServerSupervisor` adds desired-running intent, an automatic
+recovery gate, retry/backoff, stale recovery-cycle fencing, and serialization of managed server
+start/stop mutations. It does not hide a liveness source: `reconcile()` is the entry point for fresh
+reconciliation when another runtime component has reason to check the server condition.
 
 `AdbDevicesObserver` establishes `track-devices` stream mode before emitting
 `AdbDevicesObservationStarted`, emits complete snapshots through
@@ -228,17 +235,19 @@ is cleared before terminal `AdbDevicesObservationStopped` or `AdbDevicesObservat
 evidence is published. A new generation establishes a new observation baseline; observation
 termination does not imply that transports disappeared.
 
-`AdbServerEnsureOrchestrator` lives under `adb.server.lifecycle` and provides the concrete
-probe / one atomic server command / fresh verification loop represented by the ensure vocabulary.
-`AdbDevicesObservationEstablishmentOrchestrator` owns one bounded establishment
-of a `track-devices` observation generation; server ensure is a sub-step when the configured
-server is observed as unavailable, and satisfaction requires matching
-`AdbDevicesObservationStarted` evidence. `AdbDevicesObservationSupervisor`
-lives under `adb.supervision`: it owns the long-lived establishment cycle across retry attempts
-and observation generations, consumes current-generation server-connection failures, and
-schedules `AdbDevicesObservationEstablishmentRetryDue` data events with bounded
-exponential backoff and optional jitter. The scheduler only delivers the due event; control side
-effects remain in ADB supervision.
+`AdbDevicesObservationEstablishmentOrchestrator` now owns only one bounded establishment of a
+`track-devices` observation generation. It does not probe, start, or stop the ADB server;
+satisfaction requires matching `AdbDevicesObservationStarted` evidence.
+`AdbDevicesObservationSupervisor` owns the long-lived observation establishment cycle across
+retry attempts and generations, consumes current-generation server-connection failures, and
+schedules `AdbDevicesObservationEstablishmentRetryDue` data events with bounded exponential
+backoff and optional jitter. A server-connection failure is therefore observation evidence, not
+authority to mutate server desired state.
+
+`adb.managed` also exposes the intentionally unimplemented `AdbManagedRuntime` /
+`RegisteredTransport` public skeleton. That scaffold reserves the future composition boundary for
+server desired state, observation demand, and registered transport recovery without moving those
+policies into atomic commands or bounded observation establishment.
 
 ## Presentation correspondence and execution geometry
 
@@ -308,5 +317,5 @@ application-specific automation logic.
 - [`execution_capabilities.md`](docs/architecture/execution_capabilities.md) — platform-neutral
   interaction execution and native-attempt boundaries.
 - [`event_bus.md`](docs/architecture/event_bus.md) — event delivery, scheduling, and ADB
-  transport-inventory observation supervision.
+  server / transport-inventory supervision.
 - [`extensions.md`](docs/architecture/extensions.md) — external capability ownership.

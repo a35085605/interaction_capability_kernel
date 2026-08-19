@@ -6,7 +6,6 @@ from random import random
 from threading import Lock, Thread, current_thread
 
 from adb.server.endpoint import AdbServerEndpoint
-from adb.server.lifecycle import AdbServerEnsureOrchestrator
 from adb.supervision.model import (
     AdbDevicesObservationEstablishmentCycleId,
     AdbDevicesObservationSupervisionPolicy,
@@ -44,10 +43,9 @@ def _default_thread_factory(*args, **kwargs) -> Thread:
 class AdbDevicesObservationSupervisor:
     """Long-lived supervisor for one configured server's transport-inventory observation.
 
-    Startup initialization and runtime server-connection failure both use the same bounded
-    observation-establishment episode. Retry/backoff state belongs to one establishment cycle
-    and is cleared only after matching ``ObservationStarted`` evidence satisfies an episode.
-    A cycle may therefore span multiple observation generations.
+    The supervisor owns observation-generation establishment, retry/backoff, current-generation
+    filtering, and close behavior. It deliberately does not establish or mutate the ADB server;
+    server desired state and recovery belong to ``AdbServerSupervisor``.
     """
 
     def __init__(
@@ -55,7 +53,6 @@ class AdbDevicesObservationSupervisor:
         endpoint: AdbServerEndpoint,
         event_bus: EventBus,
         observation: AdbDevicesObservationController,
-        ensure_orchestrator: AdbServerEnsureOrchestrator,
         scheduler: TemporalScheduler[object],
         policy: AdbDevicesObservationSupervisionPolicy,
         *,
@@ -70,8 +67,6 @@ class AdbDevicesObservationSupervisor:
             raise TypeError("event_bus must satisfy EventBus")
         if not isinstance(observation, AdbDevicesObservationController):
             raise TypeError("observation must satisfy AdbDevicesObservationController")
-        if not isinstance(ensure_orchestrator, AdbServerEnsureOrchestrator):
-            raise TypeError("ensure_orchestrator must be AdbServerEnsureOrchestrator")
         if not isinstance(scheduler, TemporalScheduler):
             raise TypeError("scheduler must satisfy TemporalScheduler")
         if not isinstance(policy, AdbDevicesObservationSupervisionPolicy):
@@ -81,12 +76,10 @@ class AdbDevicesObservationSupervisor:
         self.endpoint = endpoint
         self._bus = event_bus
         self._observation = observation
-        self._ensure = ensure_orchestrator
         self._establishment = AdbDevicesObservationEstablishmentOrchestrator(
             endpoint,
             event_bus,
             observation,
-            ensure_orchestrator,
         )
         self._scheduler = scheduler
         self._policy = policy
@@ -101,12 +94,7 @@ class AdbDevicesObservationSupervisor:
         self._closed = False
 
     def start(self):
-        """Subscribe and establish an initial transport-inventory observation generation.
-
-        Returns the established session id when the first bounded episode succeeds immediately.
-        If that episode fails but remains retryable, retry/backoff continues under this supervisor
-        and ``None`` is returned.
-        """
+        """Subscribe and establish an initial transport-inventory observation generation."""
 
         with self._lock:
             if self._closed:
@@ -224,7 +212,6 @@ class AdbDevicesObservationSupervisor:
                 self.endpoint,
                 AdbDevicesObservationEstablishmentPolicy(
                     self._policy.episode_timeout_seconds,
-                    self._policy.ensure_policy,
                 ),
             )
         )

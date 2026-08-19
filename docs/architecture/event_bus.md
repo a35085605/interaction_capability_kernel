@@ -40,10 +40,12 @@ persistence/replay, and cross-process backpressure remain external extensions.
 Timers publish their configured data event through an `EventPublisher`. Domain supervisors decide
 what a due event means and which command, query, or orchestration operation to execute.
 
-## ADB transport-inventory observation supervision
+## ADB server and transport-inventory observation supervision
 
-ADB server availability and transport-inventory observation are separate ADB-domain conditions.
-`AdbServerEnsureOrchestrator` owns the bounded server condition-establishment path:
+ADB server availability and transport-inventory observation are separate ADB-domain conditions,
+and each condition now has its own long-lived supervisor.
+
+`AdbServerEnsureOrchestrator` still owns one bounded server condition-establishment episode:
 
 ```text
 fresh server probe
@@ -63,51 +65,62 @@ fresh server probe
               result
 ```
 
-`AdbDevicesObservationEstablishmentOrchestrator` composes that server sub-episode
-with one new `track-devices` observation generation. It is itself bounded by one authoritative
-establishment deadline and owns no retry/backoff state. A call to
-`AdbDevicesObservationController.start()` only requests a new generation;
-establishment is satisfied only after the matching `AdbDevicesObservationStarted`
-signal proves that the tracker entered stream mode. A matching failure or stop before that
-evidence terminates the episode as unsatisfied.
+`AdbServerSupervisor` owns the durable running intent around those bounded episodes:
 
 ```text
-fresh server probe
-        │
-        ├── INDETERMINATE ───────────────────► FAILED
-        │
-        ├── UNAVAILABLE ──► ensure available
-        │                         │
-        └── AVAILABLE ◄───────────┘
-                  │
-                  ▼
-        start observation generation
-                  │
-                  ▼
-       wait for matching lifecycle evidence
-          ┌───────┼─────────┐
-          │       │         │
-       Started   Failed   deadline
-          │       │         │
-          ▼       ▼         ▼
-      SATISFIED FAILED   TIMED_OUT
+desired_running + auto_recovery
+              │
+              ▼
+      bounded ensure-available
+          ┌───┴────┐
+          │        │
+      satisfied  unsatisfied
+          │        │
+          │        ▼
+          │   retry/backoff cycle
+          │        │
+          └────────┴──► fresh bounded reconciliation
 ```
 
-`AdbDevicesObservationSupervisor` under `adb.supervision` is the long-lived lifecycle
-owner around those bounded establishment episodes. Startup initialization and runtime
-server-connection re-establishment use the same establishment path. The supervisor retains one
-`AdbDevicesObservationEstablishmentCycleId` across retry attempts and owns
-retry/backoff, jitter, attempt budgets, current-generation filtering, and close behavior. It
-clears the cycle only after an establishment episode is actually satisfied, so a server that
-remains probeable while new tracker generations repeatedly fail to establish cannot reset the
-retry budget merely by allocating another generation id.
+The server supervisor owns retry/backoff, the recovery gate, recovery-cycle fencing, and
+serialization of managed server start/stop mutations. Disabling automatic recovery does not stop
+the server or change `desired_running`. `stop()` invalidates running recovery and then serializes a
+bounded ensure-unavailable episode after any already-entered managed server mutation.
 
-Runtime `AdbDevicesObservationFailed(SERVER_CONNECTION)` signals are handled outside
-the active `InMemoryEventBus` dispatch stack before waiting for establishment evidence. Scheduled
-`adb.supervision.signal.AdbDevicesObservationEstablishmentRetryDue` signals follow the
-same rule. `SERVICE` and `PROTOCOL` failures do not start the runtime re-establishment cycle.
-Server ensure remains a sub-step of an establishment episode rather than the identity of the
-long-lived supervision cycle.
+The supervisor intentionally does not invent a hidden liveness source. `reconcile()` lets the
+future managed runtime request a fresh server reconciliation when explicit runtime evidence (for
+example, another supervised condition losing its server connection) makes that useful. A later
+runtime policy may add other monitoring without coupling it to `track-devices`.
+
+`AdbDevicesObservationEstablishmentOrchestrator` is now only the bounded establishment of one
+`track-devices` observation generation. It owns no server lifecycle or retry/backoff policy:
+
+```text
+start observation generation
+          │
+          ▼
+ wait for matching lifecycle evidence
+    ┌─────┼─────────┐
+    │     │         │
+ Started Failed   deadline
+    │     │         │
+    ▼     ▼         ▼
+SATISFIED FAILED TIMED_OUT
+```
+
+A call to `AdbDevicesObservationController.start()` only requests a new generation; establishment
+is satisfied only after matching `AdbDevicesObservationStarted` evidence proves that the tracker
+entered stream mode. A matching failure or stop before that evidence terminates the episode as
+unsatisfied. No observation establishment path probes, starts, or stops the ADB server.
+
+`AdbDevicesObservationSupervisor` remains the long-lived owner around those bounded observation
+episodes. It retains one `AdbDevicesObservationEstablishmentCycleId` across retry attempts and
+owns retry/backoff, jitter, attempt budgets, current-generation filtering, and close behavior.
+Runtime `AdbDevicesObservationFailed(SERVER_CONNECTION)` starts an observation re-establishment
+cycle but does not grant authority to mutate server desired state. `SERVICE` and `PROTOCOL`
+failures still do not start that automatic re-establishment cycle. Scheduled
+`AdbDevicesObservationEstablishmentRetryDue` signals remain data events; the scheduler does not
+own control side effects.
 
 `AdbObservationSessionId` combines the `AdbServerEndpoint` with a monotonically increasing
 generation. `AdbDevicesObservation*` lifecycle signals and
@@ -116,5 +129,10 @@ episodes to ignore evidence for another generation. A newly established session 
 snapshot baseline; consumers must not diff snapshots across session generations.
 
 Every server probe, native server attempt, and terminal ensure result remains observable through
-the immutable ADB server signal vocabulary. Observation establishment additionally preserves the
-new generation identity and typed establishment failure in its returned episode result.
+the immutable ADB server signal vocabulary. Observation establishment separately preserves the new
+generation identity and typed observation failure in its returned episode result.
+
+`adb.managed.AdbManagedRuntime` and `RegisteredTransport` are currently a public scaffold only;
+their methods deliberately raise `NotImplementedError`. The scaffold marks the future coordination
+boundary where server desired state, observation demand, and registered transport recovery can be
+composed without merging their supervisor ownership.
