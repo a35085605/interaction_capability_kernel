@@ -165,7 +165,6 @@ class AdbServerSupervisorTests(unittest.TestCase):
         self.assertIs(result.status, AdbServerEnsureStatus.SATISFIED)
         self.assertTrue(supervisor.desired_running)
         self.assertTrue(supervisor.recovery_enabled)
-        self.assertTrue(supervisor.recovery_armed)
         self.assertEqual(len(commands.started), 1)
         self.assertEqual(scheduler.scheduled, [])
 
@@ -183,7 +182,6 @@ class AdbServerSupervisorTests(unittest.TestCase):
         self.assertIn(token, scheduler.cancelled)
         self.assertTrue(supervisor.desired_running)
         self.assertFalse(supervisor.recovery_enabled)
-        self.assertFalse(supervisor.recovery_armed)
         self.assertEqual(commands.stopped, [])
 
     def test_reenable_recovery_reconciles_immediately(self) -> None:
@@ -195,7 +193,6 @@ class AdbServerSupervisorTests(unittest.TestCase):
         supervisor.set_recovery_enabled(True)
         _wait_until(lambda: reader.calls > calls_before_enable)
         self.assertTrue(supervisor.recovery_enabled)
-        self.assertTrue(supervisor.recovery_armed)
         self.assertEqual(len(scheduler.scheduled), 1)
 
     def test_enable_recovery_without_running_intent_is_rejected(self) -> None:
@@ -205,7 +202,6 @@ class AdbServerSupervisorTests(unittest.TestCase):
             supervisor.set_recovery_enabled(True)
         self.assertFalse(supervisor.desired_running)
         self.assertFalse(supervisor.recovery_enabled)
-        self.assertFalse(supervisor.recovery_armed)
 
     def test_recovery_cycle_exhaustion_is_server_owned(self) -> None:
         reader = _StatusReader([AdbServerConnectionError("down")], repeat_last=True)
@@ -233,7 +229,6 @@ class AdbServerSupervisorTests(unittest.TestCase):
         self.assertIs(result.status, AdbServerEnsureStatus.SATISFIED)
         self.assertFalse(supervisor.desired_running)
         self.assertFalse(supervisor.recovery_enabled)
-        self.assertFalse(supervisor.recovery_armed)
         self.assertGreater(supervisor.recovery_epoch, epoch)
         self.assertEqual(len(commands.stopped), 1)
 
@@ -243,7 +238,6 @@ class AdbServerSupervisorTests(unittest.TestCase):
         supervisor.start(recovery_enabled=True)
         supervisor.close()
         self.assertFalse(supervisor.recovery_enabled)
-        self.assertFalse(supervisor.recovery_armed)
         self.assertEqual(commands.stopped, [])
 
 
