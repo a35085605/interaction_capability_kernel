@@ -39,7 +39,7 @@ class AdbServerSupervisor:
     """Maintain the desired running condition of one configured ADB server endpoint.
 
     The bounded ``AdbServerEnsureOrchestrator`` remains the owner of one probe/command/
-    verification episode. This supervisor owns durable running intent, the automatic-recovery
+    verification episode. This supervisor owns durable running intent, the recovery-enabled
     gate, retry/backoff state, stale-cycle fencing, and serialization of managed start/stop
     mutations for the endpoint.
 
@@ -87,7 +87,7 @@ class AdbServerSupervisor:
         self._mutation_lock = Lock()
         self._subscriptions: tuple[EventSubscriptionToken, ...] = ()
         self._desired_running = False
-        self._auto_recovery = False
+        self._recovery_enabled = False
         self._recovery_epoch = 0
         self._cycle_id: AdbServerRecoveryCycleId | None = None
         self._retry_token: ScheduleToken | None = None
@@ -100,25 +100,25 @@ class AdbServerSupervisor:
             return self._desired_running
 
     @property
-    def auto_recovery(self) -> bool:
+    def recovery_enabled(self) -> bool:
         with self._lock:
-            return self._auto_recovery
+            return self._recovery_enabled
 
     @property
     def recovery_epoch(self) -> int:
         with self._lock:
             return self._recovery_epoch
 
-    def start(self, *, auto_recovery: bool = True) -> AdbServerEnsureResult:
+    def start(self, *, recovery_enabled: bool) -> AdbServerEnsureResult:
         """Establish the running condition and optionally keep recovery armed afterwards."""
 
-        enabled = _require_bool(auto_recovery, field_name="auto_recovery")
+        enabled = _require_bool(recovery_enabled, field_name="recovery_enabled")
         with self._mutation_lock:
             with self._lock:
                 self._require_open()
                 old_token = self._invalidate_recovery_locked()
                 self._desired_running = True
-                self._auto_recovery = enabled
+                self._recovery_enabled = enabled
                 self._recovery_epoch += 1
                 cycle_id = AdbServerRecoveryCycleId.new() if enabled else None
                 self._cycle_id = cycle_id
@@ -143,6 +143,7 @@ class AdbServerSupervisor:
                 self._require_open()
                 old_token = self._invalidate_recovery_locked()
                 self._desired_running = False
+                self._recovery_enabled = False
                 self._recovery_epoch += 1
             if old_token is not None:
                 self._scheduler.cancel(old_token)
@@ -150,19 +151,23 @@ class AdbServerSupervisor:
                 AdbServerEnsureUnavailable(self.endpoint, self._policy.ensure_policy)
             )
 
-    def set_auto_recovery(self, enabled: bool) -> None:
+    def set_recovery_enabled(self, enabled: bool) -> None:
         """Enable or disable maintenance of the server running condition without stopping it."""
 
         normalized = _require_bool(enabled, field_name="enabled")
         launch_cycle: AdbServerRecoveryCycleId | None = None
         with self._lock:
             self._require_open()
-            if self._auto_recovery is normalized:
+            if normalized and not self._desired_running:
+                raise RuntimeError(
+                    "cannot enable ADB server recovery without a desired running condition"
+                )
+            if self._recovery_enabled is normalized:
                 return
             old_token = self._invalidate_recovery_locked()
-            self._auto_recovery = normalized
+            self._recovery_enabled = normalized
             self._recovery_epoch += 1
-            if normalized and self._desired_running:
+            if normalized:
                 launch_cycle = AdbServerRecoveryCycleId.new()
                 self._cycle_id = launch_cycle
                 self._ensure_retry_subscription_locked()
@@ -176,7 +181,7 @@ class AdbServerSupervisor:
 
         with self._lock:
             self._require_open()
-            if not self._desired_running or not self._auto_recovery:
+            if not self._recovery_armed_locked():
                 return
             if self._cycle_id is not None:
                 return
@@ -193,6 +198,7 @@ class AdbServerSupervisor:
             if self._closed:
                 return
             self._closed = True
+            self._recovery_enabled = False
             subscriptions = self._subscriptions
             self._subscriptions = ()
             retry_token = self._invalidate_recovery_locked()
@@ -336,10 +342,12 @@ class AdbServerSupervisor:
     def _recovery_is_current_locked(self, cycle_id: AdbServerRecoveryCycleId) -> bool:
         return (
             not self._closed
-            and self._desired_running
-            and self._auto_recovery
+            and self._recovery_armed_locked()
             and self._cycle_id == cycle_id
         )
+
+    def _recovery_armed_locked(self) -> bool:
+        return self._desired_running and self._recovery_enabled
 
     def _require_open(self) -> None:
         if self._closed:
