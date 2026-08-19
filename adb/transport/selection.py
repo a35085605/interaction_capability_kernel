@@ -54,6 +54,12 @@ class AdbTransportId(int):
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportBySerial:
+    """Select the transport directly by its native ADB serial.
+
+    This selector is passed through to native ADB serial-selection mechanisms. It does not
+    require an inventory snapshot and does not imply conversion to ``AdbTransportById``.
+    """
+
     serial: AdbDeviceSerial
 
     def __post_init__(self) -> None:
@@ -63,6 +69,8 @@ class AdbTransportBySerial:
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportById:
+    """Select one exact ADB-server-local runtime transport identity."""
+
     transport_id: AdbTransportId
 
     def __post_init__(self) -> None:
