@@ -46,13 +46,16 @@ protocol vocabulary: `AdbServerStatus`, `AdbDevicesSnapshot`, `AdbTrackedDevice`
 for one selected transport. `AdbServerEndpoint` is the ADB-domain server identity used for host
 queries, commands, observation, and same-domain orchestration. Caller-owned logical server ids
 and their association with endpoints remain external composition. `AdbDeviceSerial` is the
-persistent native key used to identify configured transports across inventory observations;
-`AdbTransportId` remains a server-local runtime identity derived from those observations.
-`adb.server.provisioning` may reserve endpoint values, but it does not own caller ids or a
-logical-id binding registry. Android owns `AndroidUserId`, `AndroidPackageName`,
-`AndroidComponentName`, logical `AndroidDisplayId`, and physical capture
-`AndroidPhysicalDisplayId`. Logical and physical display IDs are never implicitly
-interchangeable.
+persistent native key used to identify configured transports across inventory observations and
+can be selected directly through `AdbTransportBySerial`; that selection does not require a
+snapshot or conversion to a runtime transport ID. Inventory lookup by serial is a separate
+source of presence/state evidence. `AdbTransportId` remains a server-local runtime identity
+derived from those observations and is used by `AdbTransportById` only when exact runtime
+transport selection is explicitly required. `adb.server.provisioning` may reserve endpoint
+values, but it does not own caller ids or a logical-id binding registry. Android owns
+`AndroidUserId`, `AndroidPackageName`, `AndroidComponentName`, logical `AndroidDisplayId`, and
+physical capture `AndroidPhysicalDisplayId`. Logical and physical display IDs are never
+implicitly interchangeable.
 
 ## Application presentation
 

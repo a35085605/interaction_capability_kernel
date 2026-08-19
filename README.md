@@ -78,7 +78,7 @@ The repository provides reusable contracts and data models for:
 - geometry, raster, crop, resize, and transform math.
 
 Atomic native queries are owned by their native domains. ADB host-side read contracts name the
-fact they return; `AdbTrackedDeviceLookup` derives singular selection from a fresh complete
+fact they return; `AdbTrackedDeviceLookup` derives one observed row from a fresh complete
 inventory snapshot:
 
 ```python
@@ -164,22 +164,25 @@ AdbConnectionType     adb_host.proto.ConnectionType values
 non-zero `AdbTrackedDevice.transport_id` is the server-local native runtime transport identity;
 the protobuf default zero means that runtime identity is unavailable in the row. The observation
 layer publishes complete inventory snapshots. Different non-zero transport IDs denote different
-runtime transport instances; a serial-selected binding may re-resolve the same serial to a
-different current transport from fresh inventory.
+runtime transport instances.
 
 `AdbServerEndpoint` is the ADB-domain identity of one smart-socket server endpoint and is the
 server value consumed by host-side ADB queries, commands, observation, and same-domain
 orchestration. External composition owns caller logical server ids and their association with
 `AdbServerEndpoint`. `AdbDeviceSerial` is the persistent native selection key for configured ADB
-transports. `AdbTransportId` is a server-local runtime identity derived from fresh inventory
-evidence; it is not a durable configuration key. `AdbTransportFeatures` is a selected-transport
-fact with an open native feature vocabulary. Android runtime facts remain Android-owned and are
-acquired through `android.adb`.
+transports. `AdbTransportBySerial` passes that serial directly to native ADB serial-selection
+mechanisms; it does not require a transport-inventory snapshot or conversion to
+`AdbTransportById`. `AdbTransportId` is a server-local runtime identity derived from fresh
+inventory evidence; it is not a durable configuration key. `AdbTransportFeatures` is a
+selected-transport fact with an open native feature vocabulary. Android runtime facts remain
+Android-owned and are acquired through `android.adb`.
 
 `AdbTransportBindingConfiguration` associates one ADB server endpoint with an `AdbDeviceSerial`
 and an optional TCP connect address. The serial is deliberately independent from the connect
 address; preparation does not assume that the string passed to `adb connect` must later be the
-tracker serial. Runtime `transport_id` values remain fresh inventory facts rather than binding
+tracker serial. Preparation uses fresh inventory only to locate the row for that serial and
+evaluate presence/state evidence. That lookup does not change native selection to a runtime
+`transport_id`. Runtime `transport_id` values remain fresh inventory facts rather than binding
 configuration or implicit preparation continuity state.
 
 Concrete ADB-backed adapters share a private smart-socket service client. Public queries,
@@ -195,14 +198,15 @@ native attempt. `adb.pairing.command` owns one-attempt wireless pairing/trust es
 orchestration preserves the evidence for each native attempt it performs.
 
 Transport preparation is one bounded episode with two distinct gates. The **presence gate**
-resolves the configured binding against complete inventory snapshots and is satisfied by a
-matching row regardless of its `AdbConnectionState`. The **state gate** then applies an
-explicit `AdbTransportPreparationPolicy` to the same episode and observation generation. Each
-fresh snapshot re-resolves the configured serial, so a serial-selected preparation follows the
-current unique row even when its server-local `transport_id` changes. Exact runtime-transport
-continuity remains available only when a caller explicitly selects with `AdbTransportById`.
-Atomic `adb connect` attempt evidence is preserved, but fresh inventory evidence determines
-whether preparation is satisfied.
+locates the configured serial in complete inventory snapshots and is satisfied by a matching
+row regardless of its `AdbConnectionState`. The **state gate** then applies an explicit
+`AdbTransportPreparationPolicy` to the same episode and observation generation. Each fresh
+snapshot locates the current row for the configured serial so preparation can evaluate fresh
+presence/state evidence. This inventory lookup is not a selector translation: serial-selected
+queries and commands still select directly by serial. Exact runtime-transport continuity remains
+available only when a caller explicitly selects with `AdbTransportById`. Atomic `adb connect`
+attempt evidence is preserved, but fresh inventory evidence determines whether preparation is
+satisfied.
 
 `SubprocessAdbPairing` and `SubprocessAdbTransport` are each bound directly to an
 `AdbServerEndpoint` and pass that endpoint through `-H` / `-P` to their CLI commands.

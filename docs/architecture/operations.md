@@ -53,7 +53,7 @@ android.adb AdbKeyguardStateInspector.inspect(endpoint, selector)
 ```
 
 These contracts return domain-owned facts. `AdbDevicesSnapshotReader` acquires the complete
-ADB server transport inventory, while `AdbTrackedDeviceLookup` derives singular selection from
+ADB server transport inventory, while `AdbTrackedDeviceLookup` derives one observed row from
 a fresh inventory snapshot. Android framework facts remain Android-owned even when ADB is the
 access mechanism under `android.adb`. Logical `AndroidDisplayId` and physical
 `AndroidPhysicalDisplayId` remain distinct native identities.
@@ -119,7 +119,7 @@ Transport preparation keeps **responsibilities separate while keeping one episod
 ADB endpoint + serial
           │
           ▼
- serial resolution
+inventory row lookup
  ABSENT / RESOLVED / AMBIGUOUS
           │
           ▼
@@ -137,15 +137,19 @@ AdbTransportPreparationResult
 The episode uses one authoritative deadline and one active transport-inventory observation
 generation. It subscribes before its fresh initial inventory read so updates that occur during
 the probe or atomic connect attempt are not lost between separate orchestration phases. Each
-snapshot re-resolves the configured serial from fresh inventory. A serial-selected preparation
-therefore follows the current unique row for that serial even when its server-local
-`transport_id` changes between snapshots; a transient absence remains a waiting condition until
-the deadline. Runtime transport IDs remain available for callers that explicitly require exact
-`AdbTransportById` selection. A newer observation generation still terminates the episode
-because it replaces the evidence-stream baseline.
+snapshot locates the configured serial in fresh inventory evidence. That lookup exists only to
+evaluate presence and connection state; it does not translate `AdbTransportBySerial` into
+`AdbTransportById` and is not a prerequisite for native serial selection. A serial-selected
+query or command passes the serial directly to the underlying ADB selection mechanism.
+
+A serial-selected preparation therefore follows the current unique observed row for that serial
+even when the row's server-local `transport_id` changes between snapshots; a transient absence
+remains a waiting condition until the deadline. Runtime transport IDs remain available for
+callers that explicitly require exact `AdbTransportById` selection. A newer observation
+generation still terminates the episode because it replaces the evidence-stream baseline.
 
 Presence is evidence-driven. A failed atomic `AdbTcpConnect` attempt does not by itself make
-the presence gate fail if fresh inventory evidence later resolves the configured serial. The
+the presence gate fail if fresh inventory evidence later locates the configured serial. The
 attempt remains in the preparation result, while satisfaction is determined from the observed
 condition. Readiness is separately policy-driven; `DEVICE` is not a universal transport
 success state, and unknown future AOSP state values remain non-satisfying unless a policy
