@@ -21,13 +21,17 @@ def _normalize_optional_text(value: object, *, field_name: str) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportBindingConfiguration:
-    """ADB-domain binding for one endpoint and serial-selected transport.
+    """ADB-domain configuration for one endpoint and serial-selected transport.
 
-    ``serial`` is the persistent native selection key for inventory resolution and is
-    deliberately independent from ``connect_address``. The address passed to ``adb connect``
-    does not have to be identical to the serial later reported by the ADB transport inventory.
-    Runtime ``transport_id`` values are derived from fresh inventory evidence rather than stored
-    as binding configuration.
+    ``serial`` is the persistent native selection key and can be passed directly to ADB
+    serial-selection mechanisms. Preparation separately uses the same serial to locate the
+    matching row in fresh transport-inventory evidence; that lookup does not convert the
+    configuration to a runtime ``transport_id`` selector.
+
+    ``serial`` is deliberately independent from ``connect_address``. The address passed to
+    ``adb connect`` does not have to be identical to the serial later reported by the ADB
+    transport inventory. Runtime ``transport_id`` values remain fresh inventory facts rather
+    than binding configuration or implicit preparation continuity state.
     """
 
     endpoint: AdbServerEndpoint
@@ -50,7 +54,7 @@ class AdbTransportBindingConfiguration:
 
 
 class AdbTransportBindingResolutionStatus(str, Enum):
-    """How one configured serial resolves against one complete inventory snapshot."""
+    """How one configured serial appears in one complete inventory snapshot."""
 
     ABSENT = "absent"
     RESOLVED = "resolved"
@@ -59,7 +63,12 @@ class AdbTransportBindingResolutionStatus(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class AdbTransportBindingResolution:
-    """Pure projection of one configured serial into one inventory snapshot."""
+    """Pure projection of one configured serial into inventory evidence.
+
+    The result identifies matching observed rows for presence/state evaluation. It does not
+    construct an ``AdbTransportById`` selector or otherwise change how commands select the
+    transport.
+    """
 
     configuration: AdbTransportBindingConfiguration
     status: AdbTransportBindingResolutionStatus
@@ -93,7 +102,11 @@ def resolve_transport_binding(
     configuration: AdbTransportBindingConfiguration,
     snapshot: AdbDevicesSnapshot,
 ) -> AdbTransportBindingResolution:
-    """Resolve one configured serial without interpreting transport state readiness."""
+    """Locate the configured serial in fresh inventory evidence.
+
+    This lookup supports preparation presence/state evaluation only. It does not translate the
+    serial into a transport-id selector and does not participate in native serial selection.
+    """
 
     if not isinstance(configuration, AdbTransportBindingConfiguration):
         raise TypeError("configuration must be AdbTransportBindingConfiguration")
