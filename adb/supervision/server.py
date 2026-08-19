@@ -105,11 +105,6 @@ class AdbServerSupervisor:
             return self._recovery_enabled
 
     @property
-    def recovery_armed(self) -> bool:
-        with self._lock:
-            return self._recovery_armed_locked()
-
-    @property
     def recovery_epoch(self) -> int:
         with self._lock:
             return self._recovery_epoch
