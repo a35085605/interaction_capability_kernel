@@ -41,16 +41,16 @@ class _Bus:
 
 class _Observation:
     def __init__(self, session_id: AdbObservationSessionId) -> None:
-        self.current_session_id = session_id
+        self.active_session_id = session_id
 
     def start(self):
-        return self.current_session_id
+        return self.active_session_id
 
     def stop(self):
-        pass
+        self.active_session_id = None
 
     def close(self):
-        pass
+        self.active_session_id = None
 
 
 class _SnapshotReader:
@@ -217,12 +217,22 @@ class AdbTransportBindingSupervisorTests(unittest.TestCase):
         supervisor.start()
         supervisor.register(_binding())
         next_session = AdbObservationSessionId(_endpoint(), 2)
-        self.observation.current_session_id = next_session
+        self.observation.active_session_id = next_session
         self.bus.publish(AdbDevicesObservationStarted(_endpoint(), next_session))
         self.bus.publish(AdbDevicesSnapshotObserved(_endpoint(), next_session, _snapshot("target")))
         self.assertEqual(len(changes), 2)
         self.assertIsNone(changes[1].previous)
         self.assertEqual(changes[1].session_id, next_session)
+
+    def test_register_does_not_project_when_observation_is_inactive(self) -> None:
+        reader = _SnapshotReader(_snapshot("target"))
+        self.observation.active_session_id = None
+        supervisor = AdbTransportBindingSupervisor(
+            _endpoint(), self.bus, self.observation, reader, lambda config: None
+        )
+        supervisor.start()
+        supervisor.register(_binding())
+        self.assertIsNone(supervisor.resolution(_binding().serial))
 
 
 if __name__ == "__main__":
